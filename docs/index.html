@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14181f">
+<title>Crewbrain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a job-site work order. Chalk-line blue rules, one safety-yellow tag per screen, phone in the hero doing the real thing. */
+:root {
+  --paper: #eef1f4;        /* concrete, cool bias toward the chalk blue */
+  --sheet: #ffffff;
+  --ink: #14181f;
+  --muted: #56606e;
+  --line: #c9d1db;
+  --chalk: #1d5fc4;        /* chalk-line blue: the accent */
+  --chalk-soft: #dbe6f7;
+  --tag: #f5c400;          /* safety yellow, used sparingly */
+  --tag-ink: #1a1500;
+  --deny: #b3261e;
+  --deny-soft: #fbe3e1;
+  --ok: #1f7a4a;
+  --phone: #0f1318;
+  --phone-fg: #e9edf2;
+  --bubble-in: #1e2530;
+  --bubble-out: #1d5fc4;
+
+  --f-display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --s1: .5rem; --s2: 1rem; --s3: 1.5rem; --s4: 2.5rem; --s5: 4rem; --s6: 6rem;
+  --wrap: 72rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1217; --sheet: #161b22; --ink: #e8ecf1; --muted: #9aa5b3; --line: #2a323d;
+    --chalk: #6ea2f2; --chalk-soft: #17263d; --tag: #f5c400; --tag-ink: #1a1500;
+    --deny: #ff8a80; --deny-soft: #3a1a18; --ok: #6fd39c;
+    --phone: #05070a; --phone-fg: #e9edf2; --bubble-in: #1b222c; --bubble-out: #2f6fd6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1217; --sheet: #161b22; --ink: #e8ecf1; --muted: #9aa5b3; --line: #2a323d;
+  --chalk: #6ea2f2; --chalk-soft: #17263d; --tag: #f5c400; --tag-ink: #1a1500;
+  --deny: #ff8a80; --deny-soft: #3a1a18; --ok: #6fd39c;
+  --phone: #05070a; --phone-fg: #e9edf2; --bubble-in: #1b222c; --bubble-out: #2f6fd6;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; } img { max-width: 100%; } [hidden] { display: none !important; }
+/* Mobile-first: base rules are the phone layout; min-width queries add width. */
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  padding-inline: 16px;
+  padding-block: 0 calc(84px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 900px) { body { padding-inline: 32px; padding-block: 0; } }
+.wrap { max-width: var(--wrap); margin-inline: auto; }
+h1, h2, h3 { font-family: var(--f-display); line-height: .95; text-wrap: balance; margin: 0; letter-spacing: .005em; }
+h2 { font-size: clamp(2.1rem, 9vw, 3.4rem); font-weight: 800; text-transform: uppercase; }
+h3 { font-size: 1.55rem; font-weight: 800; text-transform: uppercase; }
+p { margin: 0; max-width: 62ch; }
+.label { font-family: var(--f-mono); font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+a { color: var(--chalk); }
+:focus-visible { outline: 3px solid var(--chalk); outline-offset: 3px; border-radius: 4px; }
+
+/* ---------- top bar ---------- */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  padding-block: .75rem; border-bottom: 2px solid var(--ink); background: var(--paper);
+}
+.brand { display: flex; align-items: center; gap: .55rem; font-family: var(--f-display); font-weight: 900; font-size: 1.6rem; text-transform: uppercase; letter-spacing: .02em; }
+.brand-mark { width: 28px; height: 28px; border: 3px solid var(--ink); border-radius: 50%; display: grid; place-items: center; }
+.brand-mark::after { content: ""; width: 9px; height: 9px; background: var(--tag); border-radius: 50%; border: 2px solid var(--ink); }
+.bar nav { display: flex; gap: var(--s3); align-items: center; }
+.bar nav a.wide { display: none; color: var(--ink); text-decoration: none; font-weight: 700; font-size: .95rem; }
+@media (min-width: 700px) { .bar nav a.wide { display: inline; } }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 48px;
+  font-family: var(--f-body); font-weight: 700; font-size: 1.05rem;
+  padding: .75rem 1.2rem; border-radius: 8px; border: 2px solid var(--ink);
+  background: var(--ink); color: var(--paper); cursor: pointer; text-decoration: none;
+}
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.small { min-height: 40px; padding: .45rem .85rem; font-size: .92rem; }
+
+/* sticky thumb CTA on phones */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  padding: .75rem 16px calc(.75rem + env(safe-area-inset-bottom, 0px));
+  background: var(--paper); border-top: 2px solid var(--ink);
+  display: flex; gap: .6rem; align-items: center;
+}
+.dock .btn { flex: 1; }
+.dock .note { font-size: .8rem; color: var(--muted); line-height: 1.2; max-width: 9rem; }
+@media (min-width: 900px) { .dock { display: none; } }
+
+/* ---------- hero ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); padding-block: var(--s3) var(--s5); }
+@media (min-width: 900px) { .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: var(--s5); align-items: center; padding-block: var(--s5) var(--s6); } }
+.hero h1 { font-size: clamp(3rem, 15vw, 6.6rem); font-weight: 900; text-transform: uppercase; line-height: .86; margin-top: 1rem; }
+.hero h1 .chalk {
+  color: var(--chalk);
+  background-image: linear-gradient(var(--chalk), var(--chalk));
+  background-size: 100% 4px; background-repeat: no-repeat; background-position: 0 92%;
+}
+.hero .lede { font-size: 1.15rem; margin-top: var(--s2); }
+@media (min-width: 900px) { .hero .lede { font-size: 1.25rem; margin-top: var(--s3); } }
+.hero .ctas { display: none; }
+@media (min-width: 900px) { .hero .ctas { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); } }
+.hero .fine { margin-top: var(--s2); color: var(--muted); font-size: .95rem; }
+
+.tag {
+  display: inline-flex; align-items: center; gap: .45rem;
+  background: var(--tag); color: var(--tag-ink);
+  font-family: var(--f-mono); font-weight: 700; font-size: .74rem; letter-spacing: .05em; text-transform: uppercase;
+  padding: .35rem .6rem .35rem 1rem; border-radius: 3px;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
+}
+.tag .hole { width: 6px; height: 6px; border-radius: 50%; background: var(--paper); flex: none; }
+
+/* ---------- live demo: on a phone it IS the screen; on desktop it sits in a frame ---------- */
+.phone-col { display: grid; gap: var(--s2); }
+.demo-label { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.phone { background: var(--phone); color: var(--phone-fg); border-radius: 18px; padding: 0; overflow: hidden; }
+@media (min-width: 900px) {
+  .phone-col { justify-items: center; }
+  .phone { width: 340px; border-radius: 38px; padding: 14px; box-shadow: 0 30px 60px -30px rgba(10, 20, 40, .55), 0 0 0 2px var(--line); }
+  .demo-label { width: 340px; }
+}
+.screen { background: #0b0e12; overflow: hidden; display: flex; flex-direction: column; min-height: 500px; }
+@media (min-width: 900px) { .screen { border-radius: 26px; min-height: 560px; } }
+.scr-head { display: flex; align-items: center; gap: .7rem; padding: .9rem 1rem .75rem; border-bottom: 1px solid #1f2731; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 1.3rem; background: #1e2836; flex: none; }
+.scr-title { min-width: 0; }
+.scr-title b { display: block; font-size: 1rem; }
+.scr-title span { font-family: var(--f-mono); font-size: .68rem; color: #9fb0c4; letter-spacing: .04em; }
+.expiry { margin: .7rem 1rem 0; align-self: flex-start; }
+.chat { flex: 1; display: flex; flex-direction: column; gap: .6rem; padding: 1rem; font-size: .95rem; }
+.msg { max-width: 86%; padding: .6rem .8rem; border-radius: 16px; line-height: 1.4; }
+.msg.in { background: var(--bubble-in); border-bottom-left-radius: 4px; align-self: flex-start; }
+.msg.out { background: var(--bubble-out); color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
+.msg .voice { display: flex; align-items: center; gap: .45rem; font-family: var(--f-mono); font-size: .68rem; opacity: .85; margin-bottom: .25rem; }
+.msg .cite { display: block; margin-top: .4rem; font-family: var(--f-mono); font-size: .66rem; color: #9fb0c4; }
+.msg.denied { background: transparent; border: 1px dashed #7b4a46; color: #ffb4ab; }
+.wave { display: inline-flex; gap: 2px; align-items: center; height: 10px; }
+.wave i { width: 2px; background: currentColor; border-radius: 1px; height: 4px; }
+.wave i:nth-child(2){height:9px}.wave i:nth-child(3){height:6px}.wave i:nth-child(4){height:10px}.wave i:nth-child(5){height:5px}
+.mic-row { display: flex; align-items: center; gap: .6rem; padding: .8rem 1rem 1rem; border-top: 1px solid #1f2731; }
+.mic { width: 52px; height: 52px; border-radius: 50%; background: var(--tag); color: var(--tag-ink); display: grid; place-items: center; flex: none; }
+.mic svg { width: 22px; height: 22px; }
+.typebox { flex: 1; min-width: 0; height: 42px; border-radius: 21px; background: #161c24; color: #6f7d8e; display: flex; align-items: center; padding-inline: 1rem; font-size: .88rem; }
+.ended { flex: 1; display: grid; place-items: center; align-content: center; text-align: center; padding: 2rem 1.4rem; gap: .6rem; }
+.ended b { font-family: var(--f-display); font-size: 1.8rem; text-transform: uppercase; letter-spacing: .02em; }
+.ended p { color: #9fb0c4; font-size: .92rem; }
+
+.phone-ctl { display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem; }
+@media (min-width: 480px) { .phone-ctl { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } }
+@media (min-width: 900px) { .phone-ctl { width: 340px; } }
+.switch { display: grid; grid-template-columns: 1fr 1fr; border: 2px solid var(--ink); border-radius: 8px; overflow: hidden; }
+.switch button { font: 700 .95rem var(--f-body); min-height: 44px; padding: .45rem .6rem; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
+.switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+#close-job { min-height: 44px; }
+
+/* ---------- sections ---------- */
+section.block { padding-block: var(--s5); border-top: 2px solid var(--ink); }
+@media (min-width: 900px) { section.block { padding-block: var(--s6); } }
+.sec-head { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s1); margin-bottom: var(--s3); }
+@media (min-width: 900px) { .sec-head { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); gap: var(--s3); margin-bottom: var(--s4); } }
+.sec-head p { margin-top: var(--s2); color: var(--muted); font-size: 1.05rem; }
+
+/* steps: a real sequence */
+.steps { display: grid; grid-template-columns: minmax(0, 1fr); border: 2px solid var(--ink); background: var(--sheet); }
+.step { padding: var(--s3) var(--s2); display: grid; gap: var(--s2); align-content: start; border-bottom: 2px solid var(--ink); }
+.step:last-child { border-bottom: 0; }
+@media (min-width: 900px) {
+  .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .step { padding: var(--s3); border-bottom: 0; border-right: 2px solid var(--ink); }
+  .step:last-child { border-right: 0; }
+}
+.step-top { display: flex; align-items: baseline; gap: .8rem; }
+.step .num { font-family: var(--f-display); font-weight: 900; font-size: 3.2rem; line-height: .8; color: var(--chalk); }
+.step .quote { font-family: var(--f-mono); font-size: .85rem; background: var(--chalk-soft); color: var(--ink); padding: .7rem .8rem; border-left: 3px solid var(--chalk); }
+.step p { color: var(--muted); }
+
+.card-approve { font-size: .88rem; border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; background: var(--paper); }
+.card-approve .row { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr); gap: .6rem; padding: .5rem .7rem; border-bottom: 1px solid var(--line); }
+.card-approve .k { font-family: var(--f-mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-top: .15rem; }
+.card-approve .approve { display: block; width: 100%; min-height: 48px; font: 700 1rem var(--f-body); background: var(--ink); color: var(--paper); border: 0; }
+
+/* compare: stacked rows on phones (label above, Juno | Rex below) */
+.compare { border: 2px solid var(--ink); background: var(--sheet); }
+.cmp-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+.cmp-row:last-child { border-bottom: 0; }
+.cmp-row > * { padding: .7rem .8rem; min-width: 0; }
+.cmp-row .k { grid-column: 1 / -1; padding-bottom: 0; font-family: var(--f-mono); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.cmp-row .v + .v { border-left: 1px solid var(--line); }
+.cmp-head { border-bottom: 2px solid var(--ink); }
+.cmp-head .k { display: none; }
+.who { display: flex; align-items: center; gap: .5rem; font-family: var(--f-display); font-size: 1.45rem; text-transform: uppercase; font-weight: 800; }
+.who-sub { display: block; color: var(--muted); font-size: .85rem; margin-top: .15rem; }
+@media (min-width: 760px) {
+  .cmp-row { grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 1fr); }
+  .cmp-row .k { grid-column: auto; padding-bottom: .7rem; padding-top: .9rem; }
+  .cmp-head .k { display: block; }
+  .cmp-row .v:first-of-type { border-left: 1px solid var(--line); }
+}
+.chip-no { display: inline-block; font-family: var(--f-mono); font-size: .72rem; font-weight: 700; color: var(--deny); background: var(--deny-soft); padding: .15rem .45rem; border-radius: 3px; margin-right: .35rem; }
+.code { font-family: var(--f-mono); font-weight: 700; }
+
+/* features */
+.features { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); }
+@media (min-width: 760px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4) var(--s5); } }
+.feature { display: grid; gap: var(--s1); align-content: start; border-top: 2px solid var(--chalk); padding-top: var(--s2); }
+.feature p { color: var(--muted); }
+.feature .eg { font-family: var(--f-mono); font-size: .85rem; color: var(--ink); margin-top: var(--s1); }
+
+/* lifecycle: vertical track on phones */
+.life { display: grid; grid-template-columns: minmax(0, 1fr); border: 2px solid var(--ink); background: var(--sheet); }
+.life div { padding: var(--s2); display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .8rem; align-items: baseline; border-bottom: 2px solid var(--ink); }
+.life div:last-child { border-bottom: 0; }
+@media (min-width: 760px) {
+  .life { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .life div { grid-template-columns: minmax(0, 1fr); gap: .3rem; padding: var(--s2) var(--s3); border-bottom: 0; border-right: 2px solid var(--ink); }
+  .life div:last-child { border-right: 0; }
+}
+.life b { font-family: var(--f-display); font-size: 1.45rem; text-transform: uppercase; }
+.life span { color: var(--muted); font-size: .92rem; }
+.life .live b { color: var(--ok); }
+.life .closed b { color: var(--deny); }
+.promises { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s3); margin-top: var(--s4); }
+@media (min-width: 900px) { .promises { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.promises div { display: grid; gap: .4rem; align-content: start; }
+.promises b { font-size: 1.1rem; }
+.promises p { color: var(--muted); }
+
+/* pilot */
+.pilot { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); }
+@media (min-width: 900px) { .pilot { grid-template-columns: minmax(0, 1fr) minmax(0, 26rem); gap: var(--s5); align-items: start; } }
+.pilot h2 { font-size: clamp(2.4rem, 11vw, 4.6rem); font-weight: 900; }
+.pilot ul { margin: var(--s3) 0 0; padding: 0; list-style: none; display: grid; gap: .6rem; }
+.pilot li { display: flex; gap: .7rem; align-items: baseline; }
+.pilot li::before { content: ""; width: 10px; height: 10px; flex: none; background: var(--tag); border: 2px solid var(--ink); transform: translateY(1px); }
+form.join { border: 2px solid var(--ink); background: var(--sheet); padding: var(--s3) var(--s2); display: grid; gap: var(--s2); }
+@media (min-width: 900px) { form.join { padding: var(--s3); } }
+form.join label { display: grid; gap: .35rem; font-weight: 700; font-size: .95rem; }
+form.join input, form.join select {
+  font: 400 1.0625rem var(--f-body); min-height: 48px; padding: .7rem .8rem; border: 2px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); width: 100%;
+}
+form.join input:focus, form.join select:focus { border-color: var(--chalk); outline: none; }
+.thanks { font-weight: 700; color: var(--ok); }
+
+footer { border-top: 2px solid var(--ink); padding-block: var(--s3) var(--s4); display: grid; gap: var(--s1); color: var(--muted); font-size: .9rem; }
+@media (min-width: 900px) { footer { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); justify-content: space-between; padding-block: var(--s4) var(--s5); } }
+
+
+/* knowledge shelf: the governed company brain */
+.brain { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); }
+@media (min-width: 900px) { .brain { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s5); align-items: start; } }
+.shelf { border: 2px solid var(--ink); background: var(--sheet); }
+.shelf-head { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .7rem .9rem; border-bottom: 2px solid var(--ink); }
+.shelf-head b { font-family: var(--f-display); font-size: 1.35rem; text-transform: uppercase; }
+.item { display: grid; grid-template-columns: 2.1rem minmax(0, 1fr); gap: .25rem .7rem; padding: .75rem .9rem; border-bottom: 1px solid var(--line); align-items: start; }
+.item:last-child { border-bottom: 0; }
+.src { grid-row: span 2; width: 2.1rem; height: 2.1rem; border-radius: 6px; display: grid; place-items: center; font-family: var(--f-mono); font-size: .62rem; font-weight: 700; background: var(--paper); border: 1px solid var(--line); color: var(--muted); }
+.item .t { font-weight: 700; min-width: 0; }
+.item .meta { display: flex; flex-wrap: wrap; gap: .35rem .5rem; align-items: center; font-family: var(--f-mono); font-size: .7rem; color: var(--muted); }
+.lock { display: inline-flex; align-items: center; gap: .3rem; font-family: var(--f-mono); font-size: .7rem; font-weight: 700; padding: .15rem .45rem; border-radius: 3px; border: 1px solid currentColor; }
+.lock::before { content: ""; width: 7px; height: 8px; border: 1.5px solid currentColor; border-radius: 1px; box-shadow: inset 0 0 0 1px transparent; }
+.lock.office { color: var(--deny); background: var(--deny-soft); border-color: transparent; }
+.lock.crew { color: var(--chalk); background: var(--chalk-soft); border-color: transparent; }
+.lock.home { color: var(--ok); border-color: transparent; background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.lock.changed { outline: 2px dashed var(--tag); outline-offset: 2px; }
+.rules { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+.rule { display: grid; gap: .35rem; align-content: start; }
+.rule b { font-size: 1.1rem; }
+.rule p { color: var(--muted); }
+.powered { margin-top: var(--s3); font-family: var(--f-mono); font-size: .75rem; color: var(--muted); letter-spacing: .04em; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .wave i { animation: bob 1.1s ease-in-out infinite; }
+  .wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}.wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.4s}
+  @keyframes bob { 50% { transform: scaleY(.45); } }
+  .chat .msg { animation: rise .35s ease both; }
+  @keyframes rise { from { transform: translateY(6px); } }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Crewbrain</div>
+    <nav aria-label="Main">
+      <a class="wide" href="#how">How it works</a>
+      <a class="wide" href="#brain">Company brain</a>
+      <a class="wide" href="#safe">Access</a>
+      <a class="btn small" href="#pilot">Join the pilot</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <span class="tag"><span class="hole"></span>For contractors and small crews</span>
+        <h1>Answers on every phone at the <span class="chalk">job site.</span></h1>
+        <p class="lede">Crewbrain keeps what your company knows in one place, with a lock on every page. Say what a customer or crew needs, and it builds a helper they can talk to that sees only what you allowed, until the job is done.</p>
+        <div class="ctas">
+          <a class="btn" href="#pilot">Join the pilot</a>
+          <a class="btn ghost" href="#how">See how it works</a>
+        </div>
+        <p class="fine">Works in any phone browser. Nothing to install for your customers or crew.</p>
+      </div>
+
+      <div class="phone-col">
+        <div class="demo-label"><span class="label">Try it: a live example</span></div>
+        <div class="phone" aria-label="Example conversation on a phone">
+          <div class="screen" id="screen"></div>
+        </div>
+        <div class="phone-ctl">
+          <div class="switch" role="group" aria-label="Choose a helper">
+            <button type="button" id="sw-rex" aria-pressed="true">Crew: Rex</button>
+            <button type="button" id="sw-juno" aria-pressed="false">Homeowner: Juno</button>
+          </div>
+          <button type="button" class="btn small ghost" id="close-job">Close the job</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="how">
+      <div class="sec-head">
+        <span class="label">How it works</span>
+        <div>
+          <h2>Say it. Check it. Send it.</h2>
+          <p>About two minutes from your truck. You approve every helper before anyone can open it.</p>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-top"><span class="num">1</span><h3>Say what you need</h3></div>
+          <div class="quote">“Brief Bay Roofing’s crew for 42 Oak St. Keep it until the job closes Friday.”</div>
+          <p>Talk or type. Crewbrain asks only for what it’s missing, like who the crew is or what time Friday.</p>
+        </div>
+        <div class="step">
+          <div class="step-top"><span class="num">2</span><h3>Check the card</h3></div>
+          <div class="card-approve" aria-label="Example approval card">
+            <div class="row"><span class="k">Helper</span><span>🦺 Rex, crew briefing</span></div>
+            <div class="row"><span class="k">Who</span><span>Bay Roofing crew (4 people)</span></div>
+            <div class="row"><span class="k">Knows</span><span>Oak St site brief v2, Safety rules v5</span></div>
+            <div class="row"><span class="k">Can check</span><span>Today’s schedule (read only)</span></div>
+            <div class="row"><span class="k">Can’t see</span><span>Pricing, other jobs, customer billing</span></div>
+            <div class="row"><span class="k">Ends</span><span class="code">Fri Oct 16, 6:00 PM PT</span></div>
+            <button class="approve" type="button" tabindex="-1">Approve and publish</button>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-top"><span class="num">3</span><h3>Send the link</h3></div>
+          <p>Text it or show the QR code on site. Only the people you named can open it. A forwarded link doesn’t work for anyone else.</p>
+          <p>Questions it can’t answer come to you. Your answer becomes part of what your company knows, once you approve it.</p>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="block" id="brain">
+      <div class="sec-head">
+        <span class="label">Your company brain</span>
+        <div>
+          <h2>Everything you know, with a lock on every page.</h2>
+          <p>Photos, Google Drive, Gmail and approved answers all go into one place that belongs to your company. Each item carries who may see it, and every helper is held to that.</p>
+        </div>
+      </div>
+      <div class="brain">
+        <div class="shelf" aria-label="Example company knowledge with access labels">
+          <div class="shelf-head"><b>Rivera Solar</b><span class="label">6 of 214 items</span></div>
+          <div class="item"><span class="src">PHO</span><span class="t">Panel warranty card</span><span class="meta"><span class="lock home">Homeowners</span>v1 · approved by Sam</span></div>
+          <div class="item"><span class="src">DRV</span><span class="t">42 Oak St site brief</span><span class="meta"><span class="lock crew" id="brief-lock">Crew · 42 Oak St</span><span id="brief-ver">v2 · gate code, parking, scope</span></span></div>
+          <div class="item"><span class="src">DRV</span><span class="t">Crew safety rules</span><span class="meta"><span class="lock crew">All crews</span>v5</span></div>
+          <div class="item"><span class="src">ANS</span><span class="t">“Can we add a second battery later?”</span><span class="meta"><span class="lock home">Homeowners</span>v1 · your answer, approved</span></div>
+          <div class="item"><span class="src">DRV</span><span class="t">Price book 2026</span><span class="meta"><span class="lock office">Office only</span>never reaches a helper</span></div>
+          <div class="item"><span class="src">GML</span><span class="t">Inspector emails, Oak St</span><span class="meta"><span class="lock office">Office only</span>sharing copied from Gmail</span></div>
+        </div>
+        <div class="rules">
+          <div class="rule"><b>The lock travels with the file.</b><p>Connect Google Drive or Gmail and the sharing you already set comes along. New items start as Office only until you say otherwise.</p></div>
+          <div class="rule"><b>Helpers search as their people.</b><p>Rex looks things up as the Bay Roofing crew, so the price book never comes back from the search. Nothing is fetched and then hidden.</p></div>
+          <div class="rule"><b>Change it once, it applies on the next question.</b><p>Move the site brief to Office only and every helper loses it immediately. No re-uploading.</p></div>
+          <div class="rule"><b>Remembers people, privately.</b><p>Rex can remember that Marco prefers Spanish. That memory belongs to Marco alone and is deleted when the helper ends.</p></div>
+          <div class="rule"><b>Only you make it smarter.</b><p>Answers you approve become a new version of your knowledge. Chats never turn into company facts on their own.</p></div>
+          <div class="rule"><b>Yours alone.</b><p>Each company’s knowledge sits in its own separate database. Nothing is shared with other customers.</p></div>
+          <p class="powered">Company brain powered by HydraDB</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="sec-head">
+        <span class="label">One company, many helpers</span>
+        <div>
+          <h2>Same know-how. Different doors.</h2>
+          <p>Every helper draws on the same approved knowledge, but each one only opens the parts its people need.</p>
+        </div>
+      </div>
+      <div class="compare" role="table" aria-label="Juno and Rex compared">
+        <div class="cmp-row cmp-head" role="row"><span class="k" role="columnheader">42 Oak St</span><div class="v" role="columnheader"><div class="who">🏡 Juno</div><span class="who-sub">Patel household</span></div><div class="v" role="columnheader"><div class="who">🦺 Rex</div><span class="who-sub">Bay Roofing crew</span></div></div>
+        <div class="cmp-row" role="row"><span class="k" role="rowheader">Job</span><div class="v" role="cell">Explain the install, the battery and the warranty</div><div class="v" role="cell">Brief the crew on site access, scope and safety</div></div>
+        <div class="cmp-row" role="row"><span class="k" role="rowheader">Knows</span><div class="v" role="cell">Product guide, care and warranty, install timeline</div><div class="v" role="cell">Site brief, safety rules, today’s scope</div></div>
+        <div class="cmp-row" role="row"><span class="k" role="rowheader">Can check</span><div class="v" role="cell">Install status for this house</div><div class="v" role="cell">Today’s crew schedule</div></div>
+        <div class="cmp-row" role="row"><span class="k" role="rowheader">Gate code</span><div class="v" role="cell"><span class="chip-no">No</span>Crew only</div><div class="v" role="cell"><span class="code">4417#</span></div></div>
+        <div class="cmp-row" role="row"><span class="k" role="rowheader">Your pricing</span><div class="v" role="cell"><span class="chip-no">No</span>Internal</div><div class="v" role="cell"><span class="chip-no">No</span>Internal</div></div>
+        <div class="cmp-row" role="row"><span class="k" role="rowheader">Voice</span><div class="v" role="cell">Warm, plain-spoken</div><div class="v" role="cell">Direct, practical. English or Spanish</div></div>
+        <div class="cmp-row" role="row"><span class="k" role="rowheader">Ends</span><div class="v" role="cell"><span class="code">30 days after handover</span></div><div class="v" role="cell"><span class="code">When the job closes</span></div></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="sec-head">
+        <span class="label">Built for the field</span>
+        <div>
+          <h2>Made for gloves, ladders and bad signal.</h2>
+        </div>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <h3>Talk, don’t type</h3>
+          <p>Owners set up helpers by voice between jobs. Crews ask questions out loud with their hands full.</p>
+          <p class="eg">“Where do we park?” → “Street parking on Elm. Driveway stays clear for the homeowner.”</p>
+        </div>
+        <div class="feature">
+          <h3>Their language</h3>
+          <p>Write your instructions once in English. Your crew can ask and hear answers in Spanish, or any language they’re comfortable in.</p>
+          <p class="eg">“¿Cuál es el código de la puerta?” → “Es 4417, luego la tecla de numeral.”</p>
+        </div>
+        <div class="feature">
+          <h3>Snap it to teach it</h3>
+          <p>Photograph a spec sheet, warranty card or permit. Crewbrain reads it, and you approve it before any helper can use it.</p>
+          <p class="eg">Panel warranty card → “Warranty: Rev 3”, ready for Juno</p>
+        </div>
+        <div class="feature">
+          <h3>You stay the expert</h3>
+          <p>When a helper doesn’t know, it says so and sends the question to you. It never makes up a price, a date or a promise.</p>
+          <p class="eg">Inbox: “Can we add a second battery later?”, asked by Raj Patel</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="safe">
+      <div class="sec-head">
+        <span class="label">Access that ends</span>
+        <div>
+          <h2>When the job closes, so does the helper.</h2>
+          <p>Gate codes, lockbox numbers and site notes shouldn’t outlive the job. Every helper has an exact end time, and you can shut it off with one tap.</p>
+        </div>
+      </div>
+      <div class="life" role="list" aria-label="Helper lifecycle">
+        <div role="listitem"><b>Draft</b><span>You describe it. Nobody can open it.</span></div>
+        <div role="listitem"><b>Approved</b><span>You checked exactly who, what and until when.</span></div>
+        <div role="listitem" class="live"><b>Live</b><span>Named people only. Changes need your OK.</span></div>
+        <div role="listitem" class="closed"><b>Closed</b><span>The link stops working, open chats end, and job-only knowledge locks back to Office only.</span></div>
+      </div>
+      <div class="promises">
+        <div><b>A link alone isn’t a key.</b><p>Each person signs in with their phone number. A forwarded link shows nothing.</p></div>
+        <div><b>Internal stays internal.</b><p>Pricing, margins and other jobs never reach a helper. They aren’t hidden from the AI, because they’re never handed to it.</p></div>
+        <div><b>Nothing learned behind your back.</b><p>Conversations don’t become company knowledge unless you approve the answer.</p></div>
+      </div>
+    </section>
+
+    <section class="block" id="pilot">
+      <div class="pilot">
+        <div>
+          <span class="label">Pilot · Fall 2026</span>
+          <h2 style="margin-top: .6rem">Run your next job with Crewbrain.</h2>
+          <p style="margin-top: 1rem; color: var(--muted); font-size: 1.1rem">We’re working with a small group of trade contractors to set up their first helpers with them.</p>
+          <ul>
+            <li>Electrical, solar, HVAC, roofing and plumbing</li>
+            <li>2 to 50 people on the payroll</li>
+            <li>Free during the pilot. We set up your first two helpers with you.</li>
+          </ul>
+        </div>
+        <form class="join" id="join" novalidate>
+          <label for="f-name">Your name<input id="f-name" name="name" autocomplete="name" required></label>
+          <label for="f-co">Company<input id="f-co" name="company" autocomplete="organization" required></label>
+          <label for="f-trade">Trade
+            <select id="f-trade" name="trade">
+              <option>Solar</option><option>Electrical</option><option>HVAC</option><option>Roofing</option><option>Plumbing</option><option>Other</option>
+            </select>
+          </label>
+          <label for="f-phone">Mobile number<input id="f-phone" name="phone" type="tel" autocomplete="tel" placeholder="(555) 010-4417"></label>
+          <button class="btn" type="submit">Request a spot</button>
+          <p class="thanks" id="thanks" hidden>Thanks. This preview page doesn’t send anything yet, so please also tell us in person.</p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div class="dock"><a class="btn" href="#pilot">Join the pilot</a><span class="note">Free while we pilot with contractors</span></div>
+
+  <footer>
+    <span>Crewbrain (working name) · Built at the Company Brain Hackathon, Menlo Park, Oct 12 2026</span>
+    <span>Retrieval by HydraDB · Reasoning by Claude · Voice by gpt-realtime</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const mic = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+  const wave = '<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>';
+  const helpers = {
+    rex: {
+      avatar: "🦺", name: "Rex · Crew briefing", sub: "RIVERA SOLAR · 42 OAK ST",
+      expiry: "Ends Fri 6:00 PM · when job closes",
+      msgs: [
+        { out: true, voice: "Voice · Spanish", t: "¿Cuál es el código de la puerta?" },
+        { t: "Es 4417, luego la tecla de numeral. Estaciona en la calle Elm; deja libre la entrada.", voice: "Rex", cite: "Site brief v2 · Access" },
+        { out: true, voice: "Voice", t: "What do we do with the old shingles?" },
+        { t: "Tarp the side yard first. Dumpster arrives 7:30 AM by the garage.", cite: "Site brief v2 · Scope" },
+        { out: true, t: "What's Rivera charging for this job?" },
+        { denied: true, t: "That's not something I can see. I've passed your question to Sam." }
+      ]
+    },
+    juno: {
+      avatar: "🏡", name: "Juno · Your install guide", sub: "RIVERA SOLAR · PATEL HOUSEHOLD",
+      expiry: "Ends Nov 20 · 30 days after handover",
+      msgs: [
+        { out: true, voice: "Voice", t: "Will the fridge stay on in a blackout?" },
+        { t: "Yes. Your fridge circuit is backed up, and the battery switches over in under a second.", cite: "Install record · Backed-up circuits" },
+        { out: true, t: "What's the gate code for the roofers?" },
+        { denied: true, t: "I can't share site access codes. Sam's crew has what they need." },
+        { out: true, voice: "Voice", t: "When is the inspection?" },
+        { t: "Thursday Oct 15, between 9 and 11 AM. Someone needs to be home.", cite: "Install timeline · Inspection" }
+      ]
+    }
+  };
+  let current = "rex";
+  const closed = { rex: false, juno: false };
+  const screen = document.getElementById("screen");
+  const closeBtn = document.getElementById("close-job");
+
+  function esc(s) { return s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+  function render() {
+    const h = helpers[current];
+    const head = `<div class="scr-head"><div class="avatar" aria-hidden="true">${h.avatar}</div><div class="scr-title"><b>${esc(h.name)}</b><span>${h.sub}</span></div></div>`;
+    if (closed[current]) {
+      screen.innerHTML = head + `<div class="ended"><b>This helper has ended</b><p>Sam closed the job. The chat is shut off, and the site brief with the gate code is back to Office only.</p></div>
+        <div class="mic-row"><div class="typebox">Chat closed</div></div>`;
+      closeBtn.textContent = "Reopen the demo";
+      return;
+    }
+    closeBtn.textContent = current === "rex" ? "Close the job" : "End Juno now";
+    const msgs = h.msgs.map(m => {
+      const cls = m.denied ? "msg in denied" : m.out ? "msg out" : "msg in";
+      const v = m.voice ? `<span class="voice">${m.out ? wave : ""}${esc(m.voice)}</span>` : "";
+      const c = m.cite ? `<span class="cite">↳ ${esc(m.cite)}</span>` : "";
+      return `<div class="${cls}">${v}${esc(m.t)}${c}</div>`;
+    }).join("");
+    screen.innerHTML = head + `<span class="tag expiry"><span class="hole"></span>${esc(h.expiry)}</span><div class="chat">${msgs}</div>
+      <div class="mic-row"><span class="mic" aria-hidden="true">${mic}</span><div class="typebox">Hold to talk, or type…</div></div>`;
+  }
+
+  function pick(which) {
+    current = which;
+    document.getElementById("sw-rex").setAttribute("aria-pressed", which === "rex");
+    document.getElementById("sw-juno").setAttribute("aria-pressed", which === "juno");
+    render();
+  }
+  document.getElementById("sw-rex").addEventListener("click", () => pick("rex"));
+  document.getElementById("sw-juno").addEventListener("click", () => pick("juno"));
+  closeBtn.addEventListener("click", () => {
+    closed[current] = !closed[current];
+    if (current === "rex") {
+      const lock = document.getElementById("brief-lock"), ver = document.getElementById("brief-ver");
+      lock.className = closed.rex ? "lock office changed" : "lock crew";
+      lock.textContent = closed.rex ? "Office only" : "Crew · 42 Oak St";
+      ver.textContent = closed.rex ? "v2 · locked when the job closed" : "v2 · gate code, parking, scope";
+    }
+    render();
+  });
+
+  document.getElementById("join").addEventListener("submit", e => {
+    e.preventDefault();
+    document.getElementById("thanks").hidden = false;
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
