@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>/* slash-fix */if(/\/crewbrain$/.test(location.pathname))location.replace(location.pathname+"/"+location.search+location.hash)</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crewbrain</title>
+<meta name="description" content="Make scoped, expiring helpers for your customers and crews.">
+<meta name="theme-color" content="#14181f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Crewbrain">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="owner">
+<header class="bar">
+  <button class="brand" id="brand" type="button" aria-label="Crewbrain"><span class="brand-mark" aria-hidden="true"></span>Crewbrain</button>
+  <div class="tenant" id="tenant"><b id="tenant-name">&nbsp;</b><span id="member-name"></span></div>
+  <div class="clock-pop" id="clock-pop" hidden>
+    <div class="label">Demo clock</div>
+    <button class="btn small" id="clock-advance" type="button">Skip ahead 1 day</button>
+    <button class="btn small ghost" id="clock-reset" type="button">Reset clock</button>
+    <div class="mono muted" id="clock-now" style="font-size:.7rem"></div>
+  </div>
+</header>
+
+<main>
+  <section class="view chat-view screen" id="view-create" data-view="create" hidden>
+    <div class="chat-scroll" id="creator-log" aria-live="polite"></div>
+    <form class="composer" id="composer" autocomplete="off">
+      <div class="voice-state" id="voice-state" hidden></div>
+      <div class="comp-row">
+        <button class="mic" id="mic-btn" type="button" aria-label="Talk" aria-pressed="false"></button>
+        <div class="field-wrap">
+          <input id="composer-input" type="text" enterkeyhint="send" placeholder="Tell me who needs a helper…" aria-label="Message the creator">
+          <button class="icon-btn send" id="send-btn" type="submit" aria-label="Send" disabled></button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="view" id="view-brain" data-view="brain" hidden>
+    <div class="view-head">
+      <div><h2>Brain</h2><p>Everything you know, with a lock on every page.</p></div>
+      <button class="btn yellow" id="snap-btn" type="button"></button>
+    </div>
+    <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+    <div class="shelf" id="brain-list"></div>
+  </section>
+
+  <section class="view" id="view-helpers" data-view="helpers" hidden>
+    <div class="view-head"><div><h2>Helpers</h2><p>Who can talk to what, and until when.</p></div></div>
+    <div class="cards" id="helper-list"></div>
+  </section>
+
+  <section class="view" id="view-inbox" data-view="inbox" hidden>
+    <div class="view-head"><div><h2>Inbox</h2><p>Questions, issues and walkthrough requests your helpers passed to you.</p></div></div>
+    <div id="inbox-list"></div>
+  </section>
+</main>
+
+<nav class="tabbar" role="tablist" aria-label="Sections">
+  <button class="tab" id="tab-create" role="tab" data-tab="create" type="button"><span data-icon="chat"></span>Create</button>
+  <button class="tab" id="tab-brain" role="tab" data-tab="brain" type="button"><span data-icon="brain"></span>Brain</button>
+  <button class="tab" id="tab-helpers" role="tab" data-tab="helpers" type="button"><span data-icon="helpers"></span>Helpers</button>
+  <button class="tab" id="tab-inbox" role="tab" data-tab="inbox" type="button"><span data-icon="inbox"></span>Inbox<span class="badge" id="inbox-badge" hidden>0</span></button>
+</nav>
+<script type="module" src="owner.js"></script>
+</body>
+</html>

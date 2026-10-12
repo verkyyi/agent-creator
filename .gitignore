@@ -1,0 +1,8 @@
+node_modules/
+data/
+.env
+.env.*
+!.env.example
+video/out/
+video/node_modules/
+*.log
