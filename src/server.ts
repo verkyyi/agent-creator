@@ -49,7 +49,9 @@ export function buildApp() {
     db.sessions.push({ token, memberId: m.id, tenantId: m.tenantId });
     save();
     record({ tenantId: m.tenantId, actorId: m.id, kind: "session.start" });
-    setCookie(c, "cb_session", token, { httpOnly: true, sameSite: "Lax", path: "/", secure: base(c).startsWith("https"), maxAge: 60 * 60 * 24 * 30 });
+    const https = base(c).startsWith("https");
+    // SameSite=None lets the demo work inside the landing page's embedded phone (a different site).
+    setCookie(c, "cb_session", token, { httpOnly: true, sameSite: https ? "None" : "Lax", path: "/", secure: https, maxAge: 60 * 60 * 24 * 30 });
     const a = c.req.query("a") ?? core.helpersFor(m).find((x) => x.state === "active")?.id;
     return c.redirect(m.role === "owner" ? "../" : a ? `../a.html?id=${a}` : "../a.html");
   });
