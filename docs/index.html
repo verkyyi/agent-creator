@@ -103,6 +103,8 @@ section { padding-block: var(--s5); border-top: 2px solid var(--ink); }
 .video-slot { margin-top: var(--s3); border: 2px dashed var(--line); border-radius: 12px; aspect-ratio: 16 / 9; display: grid; place-items: center; text-align: center; padding: var(--s2); color: var(--muted); font-family: var(--f-mono); max-width: 52rem; }
 
 footer { border-top: 2px solid var(--ink); padding-block: var(--s3) var(--s4); display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; justify-content: space-between; color: var(--muted); font-size: .95rem; }
+.demo-video { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border: 2px solid var(--ink); border-radius: 10px; background: #000; display: block; }
+.video-note { margin-top: .6rem; font-size: .95rem; }
 </style>
 </head>
 <body>
@@ -120,7 +122,7 @@ footer { border-top: 2px solid var(--ink); padding-block: var(--s3) var(--s4); d
         <p class="lede">Tell Crewbrain what your homeowners and crews need to know. It answers them by voice, in their language, sees only what you allow, and shuts off when the job ends.</p>
         <div class="ctas">
           <a class="btn" href="https://macmini.tail435588.ts.net:10000/crewbrain/demo.html">Try the live demo</a>
-          <a class="btn ghost" href="#video">Watch the 5-minute video</a>
+          <a class="btn ghost" href="#video">Watch the 4-minute video</a>
         </div>
       </div>
       <div class="device">
@@ -160,8 +162,9 @@ footer { border-top: 2px solid var(--ink); padding-block: var(--s3) var(--s4); d
     </section>
 
     <section id="video">
-      <h2>See it in five minutes</h2>
-      <div class="video-slot">Video coming at submission</div>
+      <h2>See it in four minutes</h2>
+      <video class="demo-video" controls playsinline preload="metadata" poster="media/poster.png" src="media/crewbrain-demo-720p.mp4"></video>
+      <p class="video-note"><a href="https://github.com/verkyyi/agent-creator/releases/tag/v1.0-hackathon">Download the 1080p version</a></p>
     </section>
   </main>
 
