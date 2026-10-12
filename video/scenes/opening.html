@@ -1,0 +1,50 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Opening</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* 0-6s notifications · 6-19s split screen (real app replies) · 19s+ title cards */
+.notes { position: absolute; left: 560px; width: 800px; top: 230px; display: grid; gap: 22px; }
+.note { background: var(--sheet); border: 2px solid var(--ink); border-radius: 18px; padding: 22px 28px; box-shadow: 8px 8px 0 rgba(20,24,31,.12); }
+.note .who { font-family: var(--f-mono); font-size: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.note .txt { font-size: 40px; font-weight: 700; margin-top: 6px; }
+.addr { position: absolute; left: 560px; top: 820px; font-family: var(--f-display); font-weight: 900; font-size: 64px; text-transform: uppercase; }
+@keyframes outA { to { opacity: 0; transform: translateY(-20px); } }
+.phase1 { animation: outA .5s ease forwards; animation-delay: 9.5s; }
+.split { position: absolute; left: 120px; right: 120px; top: 170px; bottom: 170px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; opacity: 0; animation: in .6s ease 10s forwards, outA .5s ease 19.5s forwards; }
+.side { background: var(--phone); color: var(--phone-fg); border-radius: 30px; padding: 36px 40px; display: grid; align-content: start; gap: 22px; }
+.side h3 { font-family: var(--f-display); font-weight: 800; font-size: 54px; text-transform: uppercase; margin: 0; }
+.side .lbl { font-family: var(--f-mono); font-size: 20px; color: #9aa5b3; letter-spacing: .08em; text-transform: uppercase; }
+.q { justify-self: end; background: #1d5fc4; color: #fff; padding: 18px 24px; border-radius: 20px 20px 4px 20px; font-size: 32px; max-width: 90%; }
+.a { background: #1e2530; padding: 18px 24px; border-radius: 20px 20px 20px 4px; font-size: 32px; max-width: 92%; }
+.a.no { border: 2px dashed #ff8a80; color: #ffb4ab; background: transparent; }
+.verdict { font-family: var(--f-mono); font-weight: 700; font-size: 24px; }
+.cards { position: absolute; left: 120px; right: 120px; top: 200px; display: grid; gap: 26px; }
+.cards h1 { font-size: 150px; }
+.cards .line { font-size: 40px; font-weight: 700; max-width: 40ch; margin-top: 20px; color: var(--muted); }
+</style></head>
+<body>
+<div class="topbar in"><div class="brand"><span class="brand-mark"></span>Crewbrain</div><div class="label">A day at 42 Oak St</div></div>
+<div class="phase1">
+  <div class="notes">
+    <div class="note pop" style="animation-delay:.3s"><div class="who">Bay Roofing · now</div><div class="txt">"Where should we park?"</div></div>
+    <div class="note pop" style="animation-delay:1.3s"><div class="who">Anita Patel · now</div><div class="txt">"What does the warranty cover?"</div></div>
+    <div class="note pop" style="animation-delay:2.3s"><div class="who">Marco · now</div><div class="txt">"Found damage. Who do I tell?"</div></div>
+  </div>
+  <div class="addr up" style="animation-delay:5s">📍 42 Oak St</div>
+</div>
+<div class="split">
+  <div class="side"><div class="lbl">Homeowner helper</div><h3>🏡 Juno</h3>
+    <div class="q">What's the temporary crew access code?</div>
+    <div class="a no">I don't have access to crew-only details.</div>
+    <div class="verdict" style="color:#ff8a80">🔒 Crew only — not shared</div></div>
+  <div class="side"><div class="lbl">Crew helper</div><h3>🦺 Rex</h3>
+    <div class="q">¿Cuál es el código de acceso?</div>
+    <div class="a">Es 4417, luego numeral.</div>
+    <div class="verdict" style="color:#6fd39c">✓ Site brief · Crew · 42 Oak St</div></div>
+</div>
+<div class="cards">
+  <h1 class="up" style="animation-delay:20s">One company brain</h1>
+  <h1 class="up" style="animation-delay:21s"><span class="chalk">The right access</span></h1>
+  <h1 class="up" style="animation-delay:22s">Access that ends</h1>
+</div>
+</body></html>

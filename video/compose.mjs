@@ -64,7 +64,7 @@ try {
   if (!existsSync(warranty)) await renderPng(browser, join(DIR, "assets", "warranty-card.html"), warranty, { width: 1200, height: 900 });
 
   let srt = "", n = 1;
-  const stepOf = { brain: 1, create: 2, use: 3, locks: 4 };
+  const stepOf = {};
   const whoOf = { owner: "Sam · Owner view", customer: "Homeowner + crew view", mixed: "Owner · homeowner · crew" };
 
   for (const seg of segs) {
@@ -143,7 +143,8 @@ console.log(`\nwrote ${final} (${probeDuration(final).toFixed(2)}s)`);
 
 // ---------- app footage: concat raw webm(s) for the segment, fit to segment length ----------
 function fitAppFootage(seg, out) {
-  let raws = existsSync(RAW) ? readdirSync(RAW).filter((f) => new RegExp(`^seg-${seg.id}([-_.].*)?\\.webm$`).test(f)).sort().map((f) => join(RAW, f)) : [];
+  let raws = seg.visual.raws ? seg.visual.raws.map((n) => join(RAW, `${n}.webm`)).filter((f) => existsSync(f))
+    : existsSync(RAW) ? readdirSync(RAW).filter((f) => new RegExp(`^seg-${seg.id}([-_.].*)?\\.webm$`).test(f)).sort().map((f) => join(RAW, f)) : [];
   raws = raws.filter((f) => { try { return probeDuration(f) > 0.5; } catch { return false; } });
   if (!raws.length && existsSync(join(RAW, "placeholder.webm"))) raws = [join(RAW, "placeholder.webm")];
   if (!raws.length) {

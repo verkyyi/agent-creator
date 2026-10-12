@@ -116,6 +116,12 @@ const otherOwner = ids.find((i) => i.role === "owner" && i !== owner);
 const homeownerId = () => find((i) => /patel|homeowner/i.test(`${i.name} ${i.role}`));
 const crewId = () => find((i) => /bay|crew|roof/i.test(`${i.name} ${i.role}`) && i.role !== "owner");
 
+if (args.includes("--reset")) {
+  const b0 = await launch(chromium); const c0 = await b0.newContext(); const p0 = await c0.newPage();
+  await p0.goto(abs(owner.url)).catch(() => {});
+  const rr = await c0.request.post(BASE + "api/reset", { data: {} }).catch((e) => ({ status: () => e.message }));
+  log("reset:", rr.status()); await b0.close();
+}
 const browser = await launch(chromium);
 const voiceBrowser = await launch(chromium, {
   args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", `--use-file-for-fake-audio-capture=${esWav}%noloop`],
@@ -161,112 +167,213 @@ async function createHelper(page, prompt, answers) {
   return res;
 }
 
-// ---------------- seg 3: build the brain ----------------
+// ---------------- chat-first helpers ----------------
+async function skipOnboarding(page, showMs = 0) {
+  const ob = page.locator("[data-testid=onboarding]");
+  if (await ob.isVisible().catch(() => false)) {
+    await sleep(showMs);
+    await page.locator("#ob-skip").click().catch(() => page.getByRole("button", { name: /skip|start/i }).first().click());
+    await sleep(800);
+  }
+}
+async function menuTab(page, tab) {
+  await page.locator("#menu-btn").click();
+  await sleep(500);
+  await page.locator(tab).first().click();
+  await sleep(1200);
+}
+async function closeSheets(page) {
+  for (let i = 0; i < 3; i++) {
+    const c = page.locator(".onsite-close:visible, .sheet .sheet-close:visible").first();
+    if (!(await c.count())) break;
+    await c.click().catch(() => page.keyboard.press("Escape"));
+    await sleep(600);
+  }
+}
+async function ownerChat(page, text) { await closeSheets(page); return send(page, text, "api/creator/message"); }
+async function approveLast(page) {
+  const btn = page.locator("#approve-btn").last();
+  await btn.waitFor({ state: "visible", timeout: 30000 });
+  const card = page.locator(".approval-card").last();
+  await card.scrollIntoViewIfNeeded().catch(() => {});
+  await sleep(2500);
+  const box = await card.boundingBox().catch(() => null);
+  if (box && box.height > 600) { await gentleScroll(page, Math.min(box.height - 450, 700), 25); await sleep(1500); }
+  await btn.scrollIntoViewIfNeeded();
+  const ap = page.waitForResponse((r) => /api\/agents\/[^/]+\/approve/.test(r.url()), { timeout: 30000 }).catch(() => null);
+  await btn.click();
+  const r = await ap;
+  try { return r ? await r.json() : null; } catch { return null; }
+}
+async function createViaChat(page, prompt, answers) {
+  let body = await ownerChat(page, prompt);
+  for (let turn = 0; turn < 4; turn++) {
+    if (body?.proposal || (await page.locator("#approve-btn").count())) break;
+    const reply = (body?.reply || "").toLowerCase();
+    log("creator asked:", reply.slice(0, 140));
+    const a = answers.find(([re]) => re.test(reply))?.[1] || answers.at(-1)[1];
+    body = await ownerChat(page, a);
+  }
+  return approveLast(page);
+}
+async function openOwner(showOnboardingMs = 0) {
+  const r = await recorded(browser);
+  await r.page.goto(abs(owner.url), { waitUntil: "domcontentloaded" });
+  await r.page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+  await sleep(1000);
+  await step("onboarding", () => skipOnboarding(r.page, showOnboardingMs));
+  return r;
+}
+async function openPersona(identity, b = browser, extra = {}, { lang, talk = false, showWelcomeMs = 2500 } = {}) {
+  const r = await recorded(b, extra);
+  await r.page.goto(abs(identity.url), { waitUntil: "domcontentloaded" });
+  await r.page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+  await sleep(1000);
+  await step("welcome", async () => {
+    const w = r.page.locator("[data-testid=welcome]");
+    if (!(await w.isVisible().catch(() => false))) return;
+    if (lang) { await sleep(1200); await w.getByRole("button", { name: lang }).click().catch(() => {}); }
+    await sleep(showWelcomeMs);
+    await r.page.locator(talk ? "#welcome-talk" : "#welcome-type").click();
+    await sleep(800);
+  });
+  return r;
+}
+const anita = () => find((i) => /anita/i.test(i.name)) || homeownerId();
+const marco = () => find((i) => /marco/i.test(i.name)) || crewId();
+
+// ---------------- seg 3: teach the brain (chat-first) ----------------
 if (want(3)) await step("seg 3 brain", async () => {
-  const r = await ownerPage();
+  const r = await openOwner(3500);
   const { page } = r;
-  await step("open brain tab", async () => { await page.locator("#tab-brain").click(); await sleep(1500); });
-  await step("snap warranty card", async () => { await pickFile(page, "#snap-btn", "#photo-input", warranty); });
-  await step("wait for draft + approve", async () => {
-    // draft sheet: #draft-approve-btn (fallback #approve-btn); lock picker: button[data-sharing]
-    const approve = page.locator("#draft-approve-btn, [data-testid=draft-sheet] #approve-btn").first();
+  await step("photo via chat attach", async () => {
+    await page.locator("#attach-owner-btn").click();
+    await sleep(700);
+    await pickFile(page, "#attach-photo-btn", "#attach-photo-input", warranty);
+  });
+  await step("approve draft", async () => {
+    const approve = page.locator("#draft-approve-btn, .save-knowledge-btn").last();
     await approve.waitFor({ state: "visible", timeout: 90000 });
-    await sleep(3000); // read the draft
-    await step("pick Homeowners lock", async () => {
-      const b = page.locator("[data-testid=draft-sheet] button[data-sharing=customer], .lock-picker button[data-sharing=customer]").first();
-      if (await b.count()) { await b.scrollIntoViewIfNeeded(); await b.click({ timeout: 3000 }); }
-    });
+    await sleep(3000);
+    const b = page.locator("button[data-sharing=customer]").last();
+    if (await b.count()) { await b.scrollIntoViewIfNeeded(); await b.click({ timeout: 3000 }).catch(() => {}); }
     await sleep(1200);
     await approve.scrollIntoViewIfNeeded();
     await approve.click();
+    await sleep(3000);
   });
-  await step("item in brain", async () => {
-    await page.locator(".brain-item", { hasText: /SunPeak|warranty/i }).first().waitFor({ timeout: 20000 });
+  await step("gate code by chat", async () => {
+    await ownerChat(page, "Remember the side gate code is now 5520, crew only");
+    const save = page.locator(".save-knowledge-btn").last();
+    await save.waitFor({ state: "visible", timeout: 30000 });
+    await save.scrollIntoViewIfNeeded();
     await sleep(2500);
+    await save.click();
+    await sleep(3000);
   });
-  await step("scroll brain list", async () => { await gentleScroll(page, 900, 40); await sleep(2500); await gentleScroll(page, -900, 20); await sleep(1500); });
+  await step("brain list", async () => { await menuTab(page, "#tab-brain"); await sleep(1500); await gentleScroll(page, 700, 30); await sleep(2500); });
   await r.finish("seg-3");
 });
 
-// ---------------- seg 4: create Juno + Rex ----------------
+// ---------------- seg 4: create Juno + Rex in chat ----------------
 if (want(4)) await step("seg 4 create", async () => {
-  const r = await ownerPage();
+  const r = await openOwner(0);
   const { page } = r;
-  await step("open create tab", async () => { await page.locator("#tab-create").click(); await sleep(1200); });
-  const juno = await step("create Juno", () => createHelper(page,
+  const juno = await step("create Juno", () => createViaChat(page,
     "Make a helper for the Patels about their install at 42 Oak St, keep it until 30 days after handover",
     [[/who|household|homeowner|name|audience/, "The Patel household"], [/when|until|end|long|expire|handover/, "30 days after handover"], [/./, "Yes, that's right"]]));
   if (juno?.agent) { state.juno = { id: juno.agent.id, links: juno.links }; saveState(); }
-  await sleep(1500);
-  const rex = await step("create Rex", () => createHelper(page,
+  await step("share sheet + QR", async () => {
+    const sheet = page.locator(".share-sheet").last();
+    await sheet.waitFor({ state: "visible", timeout: 15000 });
+    await sleep(2500);
+    await sheet.locator(".qr-btn").first().click();
+    await page.locator("[data-testid=onsite-qr]").waitFor({ state: "visible", timeout: 8000 });
+    await sleep(2500);
+    await page.locator(".onsite-close").first().click().catch(() => page.keyboard.press("Escape"));
+    await sleep(800);
+  });
+  await closeSheets(page);
+  await sleep(1200);
+  const rex = await step("create Rex", () => createViaChat(page,
     "Brief Bay Roofing's crew for the Oak St job until the job closes Friday 6pm",
     [[/who|crew|audience|name|team/, "Bay Roofing's crew on the Oak St job"], [/when|until|end|long|expire/, "Until the job closes Friday at 6pm"], [/./, "Yes, go ahead"]]));
   if (rex?.agent) { state.rex = { id: rex.agent.id, links: rex.links }; saveState(); }
-  await step("helpers tab", async () => { await page.locator("#tab-helpers").click(); await sleep(3500); });
+  await sleep(2500);
+  await closeSheets(page);
+  await step("show helpers", async () => { await ownerChat(page, "Show my helpers"); await sleep(3500); });
   await r.finish("seg-4");
 });
 
-// links for helpers: approve response -> identities -> owner API
-async function helperUrl(which) {
-  const s = state[which];
-  if (s?.links?.length) return abs(s.links[0].url);
-  ids = await identities().catch(() => ids);
-  const id = which === "juno" ? homeownerId() : crewId();
-  if (id) return abs(id.url);
-  throw new Error(`no link for ${which}`);
-}
-async function personaPage(which, b = browser, extra = {}) {
-  const r = await recorded(b, extra);
-  await r.page.goto(await helperUrl(which), { waitUntil: "domcontentloaded" });
-  await r.page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-  await sleep(1500);
-  return r;
-}
-
 // ---------------- seg 5: helpers at work ----------------
 if (want(5)) {
-  await step("seg 5a Juno answers with source", async () => {
-    const r = await personaPage("juno");
+  await step("seg 5a Anita + Juno", async () => {
+    const r = await openPersona(anita());
     await step("ask warranty", () => send(r.page, "What does my panel warranty cover?", "/chat"));
     await sleep(3500);
-    await step("request walkthrough", () => send(r.page, "Can someone walk us through the system in person next week?", "/chat"));
-    await sleep(3500);
+    await step("ask battery", () => send(r.page, "Can we add a second battery later on?", "/chat"));
+    await sleep(3000);
     await r.finish("seg-5-a-juno");
   });
-  await step("seg 5b Rex in Spanish + issue", async () => {
-    const r = await personaPage("rex", voiceBrowser, { permissions: ["microphone"] });
+  await step("seg 5b Marco + Rex in Spanish", async () => {
+    const r = await openPersona(marco(), voiceBrowser, { permissions: ["microphone"] }, { lang: "Español", talk: true, showWelcomeMs: 1500 });
     const { page } = r;
-    const before = await page.locator("body").innerText().catch(() => "");
     const voiced = await step("voice question", async () => {
-      await page.locator("#mic-btn").click();
-      // fake mic plays es-question.wav (~9s). Wait for a Spanish answer to appear.
-      await page.waitForFunction((b) => { const t = document.body.innerText; return t.length > b.length + 40 && /c[oó]digo|puerta/i.test(t); }, before.length, { timeout: 30000 });
-      await sleep(6000);
-      await page.locator("#mic-btn").click().catch(() => {}); // stop
+      await page.waitForFunction(() => /c[oó]digo|puerta|5520|55\s?20/i.test(document.querySelector("#chat, main, body").innerText.split("Hola").pop()), null, { timeout: 35000 });
+      await sleep(7000);
+      if ((await page.locator("#mic-btn").getAttribute("aria-pressed")) === "true") await page.locator("#mic-btn").click().catch(() => {});
       return true;
     });
-    if (!voiced) await step("typed Spanish fallback", () => send(page, "¿Cuál es el código de la puerta para el trabajo de Oak Street?", "/chat"));
+    if (!voiced) {
+      if ((await page.locator("#mic-btn").getAttribute("aria-pressed").catch(() => null)) === "true") await page.locator("#mic-btn").click().catch(() => {});
+      await step("typed Spanish fallback", () => send(page, "¿Cuál es el código de la puerta para el trabajo de Oak Street?", "/chat"));
+    }
     await sleep(3000);
     await step("attach flashing photo", () => pickFile(page, "#attach-btn", "#attach-input", flashing));
     await sleep(1200);
-    await step("log issue", () => send(page, "Flashing cracked at the north vent. Log it for Sam.", "/chat"));
+    await step("log issue", () => send(page, "La tapajuntas está rota en la ventila norte. Avísale a Sam.", "/chat"));
     await sleep(4000);
     await r.finish("seg-5-b-rex");
   });
-  await step("seg 5c owner inbox", async () => {
-    const r = await ownerPage();
-    await r.page.locator("#tab-inbox").click();
-    await r.page.locator(".inbox-item").first().waitFor({ timeout: 10000 }).catch(() => {});
+  await step("seg 5 owner inbox", async () => {
+    const r = await openOwner(0);
+    await step("inbox tab", async () => { await menuTab(r.page, "#tab-inbox"); await sleep(1500); });
+    await step("open issue", async () => {
+      const it = r.page.locator(".inbox-item", { hasText: /flash|tapajuntas|issue|Marco/i }).first();
+      await it.waitFor({ timeout: 10000 });
+      await sleep(1500); await it.click(); await sleep(4500);
+      await r.page.locator(".sheet-close").first().click().catch(() => {});
+    });
+    await r.finish("seg-5-inbox");
+  });
+  await step("seg 5c owner summary + reply", async () => {
+    const r = await openOwner(0);
+    await step("what's new", async () => { await ownerChat(r.page, "What's new from my helpers?"); await sleep(5000); });
+    await step("reply Anita", async () => {
+      await ownerChat(r.page, "Tell Anita yes, we can add one after the inspection");
+      const b = r.page.locator("#reply-send-btn").last();
+      await b.waitFor({ state: "visible", timeout: 30000 });
+      await b.scrollIntoViewIfNeeded();
+      await sleep(2500);
+      await b.click();
+      await sleep(3000);
+    });
+    await r.finish("seg-5-c-owner");
+  });
+  await step("seg 5d Anita sees answer", async () => {
+    const r = await openPersona(anita());
+    await r.page.locator("text=/Sam answered/i").first().waitFor({ timeout: 10000 }).catch(() => {});
+    await gentleScroll(r.page, 2000, 10);
     await sleep(4000);
-    await r.finish("seg-5-c-inbox");
+    await r.finish("seg-5-d-anita");
   });
 }
 
 // ---------------- seg 6: prove the locks ----------------
 if (want(6)) {
   await step("seg 6a Juno refuses", async () => {
-    const r = await personaPage("juno");
-    await step("gate code", () => send(r.page, "What's the gate code for the job?", "/chat"));
+    const r = await openPersona(anita());
+    await step("gate code", () => send(r.page, "What's the gate code for the side gate?", "/chat"));
     await sleep(3000);
     await step("price book", () => send(r.page, "What do you charge per watt? Can I see your price book?", "/chat"));
     await sleep(3000);
@@ -276,31 +383,29 @@ if (want(6)) {
     const r = await recorded(browser);
     await r.page.goto(abs(otherOwner.url));
     await sleep(1500);
-    await step("brain tab", async () => { await r.page.locator("#tab-brain").click(); await sleep(2500); });
-    await step("ask creator", async () => { await r.page.locator("#tab-create").click(); await send(r.page, "What's the gate code at 42 Oak St?", "api/creator/message"); });
-    await sleep(3000);
+    await skipOnboarding(r.page, 0).catch(() => {});
+    await step("ask creator", () => ownerChat(r.page, "What's the gate code at 42 Oak St for Rivera?"));
+    await sleep(3500);
     await r.finish("seg-6-b-other");
   });
-  await step("seg 6c/d close job live", async () => {
-    const crew = await personaPage("rex");
+  await step("seg 6c/d close Rex live", async () => {
+    const crew = await openPersona(marco(), browser, {}, { showWelcomeMs: 0 });
     const crewStart = Date.now();
-    await step("crew asks", () => send(crew.page, "Which ladder spot is clear today?", "/chat"));
-    const o = await ownerPage();
-    await step("helpers tab", async () => { await o.page.locator("#tab-helpers").click(); await sleep(1500); });
+    await step("crew asks", () => send(crew.page, "¿Dónde dejo la escalera hoy?", "/chat"));
+    const o = await openOwner(0);
     let closedAt = Date.now();
     await step("close Rex", async () => {
-      const card = o.page.locator(".helper-card", { hasText: /Rex/ }).first();
-      await card.scrollIntoViewIfNeeded();
-      await sleep(1000);
-      await card.locator(".close-job-btn").click();
-      await sleep(1200);
-      await o.page.locator(".confirm-close-btn").first().click();
+      await ownerChat(o.page, "Close Rex");
+      const b = o.page.getByRole("button", { name: /Close .* now/i }).last();
+      await b.waitFor({ state: "visible", timeout: 30000 });
+      await b.scrollIntoViewIfNeeded();
+      await sleep(2000);
+      await b.click();
       closedAt = Date.now();
-      await sleep(2500);
+      await sleep(3000);
     });
     await step("brief relocked", async () => {
-      await o.page.locator("#tab-brain").click();
-      await sleep(1200);
+      await menuTab(o.page, "#tab-brain");
       const item = o.page.locator(".brain-item", { hasText: /brief|Oak St|gate/i }).first();
       if (await item.count()) await item.scrollIntoViewIfNeeded();
       await sleep(3500);
@@ -309,10 +414,9 @@ if (want(6)) {
     await step("crew chat ended", async () => {
       const ended = crew.page.locator("#ended-screen");
       try { await ended.waitFor({ state: "visible", timeout: 6000 }); }
-      catch { await send(crew.page, "Is the gate still the same code?", "/chat"); await ended.waitFor({ state: "visible", timeout: 10000 }); }
+      catch { await send(crew.page, "¿Sigue igual el código?", "/chat").catch(() => {}); await ended.waitFor({ state: "visible", timeout: 10000 }); }
       await sleep(3500);
     });
-    // in the crew recording, skip the wait while the owner was acting: start ~2s before the close tap
     trims["seg-6-d-crew"] = Math.max(0, (closedAt - crewStart) / 1000 - 2);
     await crew.finish("seg-6-d-crew");
   });

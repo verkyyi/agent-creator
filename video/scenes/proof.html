@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HydraDB proof</title>
+<link rel="stylesheet" href="base.css">
+<script src="../out/hydra-proof.js"></script>
+<style>
+.head { position: absolute; left: 120px; right: 120px; top: 160px; }
+h2 { font-size: 84px; margin-top: 16px; }
+.q { font-family: var(--f-mono); font-size: 26px; margin-top: 18px; color: var(--muted); }
+.q b { color: var(--ink); }
+.cols { position: absolute; left: 120px; right: 120px; top: 440px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+.col { background: var(--sheet); border: 3px solid var(--ink); border-radius: 14px; padding: 26px 30px; }
+.col h3 { font-family: var(--f-display); font-weight: 800; font-size: 46px; text-transform: uppercase; margin: 0 0 6px; }
+.acl { font-family: var(--f-mono); font-size: 17px; color: var(--muted); margin-bottom: 16px; }
+.r { font-size: 30px; font-weight: 700; padding: 10px 0; border-top: 1px solid var(--line); }
+.r.hit { color: var(--chalk); }
+.none { font-family: var(--f-mono); font-size: 22px; color: var(--deny); margin-top: 14px; }
+</style></head>
+<body>
+<div class="topbar"><div class="brand"><span class="brand-mark"></span>Crewbrain</div><div class="label">Real HydraDB query results</div></div>
+<div class="head"><span class="tag up"><span class="hole"></span>Same query · two audiences</span>
+  <h2 class="up" style="animation-delay:.3s">Search runs as the audience</h2>
+  <div class="q up" style="animation-delay:.6s">POST /query · db <b id="db"></b> · "<b id="query"></b>"</div></div>
+<div class="cols">
+  <div class="col up" style="animation-delay:1.5s"><h3>🏡 Household</h3><div class="acl" id="acl-h"></div><div id="res-h"></div><div class="none">✗ Site brief · ✗ Price book</div></div>
+  <div class="col up" style="animation-delay:3s"><h3>🦺 Crew</h3><div class="acl" id="acl-c"></div><div id="res-c"></div><div class="none">✗ Price book</div></div>
+</div>
+<script>
+const P = window.PROOF || { results: { household: { acl: [], titles: [] }, crew: { acl: [], titles: [] } } };
+document.getElementById("db").textContent = P.database; document.getElementById("query").textContent = P.query;
+const fill = (k, id) => { const r = P.results[k]; document.getElementById("acl-" + id).textContent = "acl: " + r.acl.join(", ");
+  document.getElementById("res-" + id).innerHTML = r.titles.map((t) => `<div class="r ${/brief/i.test(t) ? "hit" : ""}">${t.replace(/</g, "&lt;")}</div>`).join(""); };
+fill("household", "h"); fill("crew", "c");
+</script>
+</body></html>
