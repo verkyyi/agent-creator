@@ -1,0 +1,120 @@
+我建议把视频拍成 **“42 Oak St 的一天”**：一个忙不过来的老板、一个屋主、一个施工队，所有演示都围绕同一个工地。
+
+评委应该记住这句话：
+
+**Crewbrain 把老板脑中的公司知识，变成能说话、能办事，而且有权限和期限的助手。**
+
+看过[现有页面](https://verkyyi.github.io/agent-creator/)后，最值得放大的两个瞬间是：**同一个问题，Juno 和 Rex 得到不同结果；老板点下 Close job，Rex 的访问就结束。**
+
+原来的 outline 内容很全，我会调整三点：
+
+- **删掉开场半分钟的市场数字。** 600k、16% 确认来源和统计口径后放 Devpost。视频先让人看到问题和产品。
+- **前 30 秒就亮出权限差异。** 这是理解 Crewbrain 的最快方式。
+- **给“办事”和“知识更新”留完整镜头。** 评委要看到动作落到哪里、公司脑怎么变得更有用。
+
+下面按英文参赛视频设计，中文部分是拍摄说明。
+
+**开场 30 秒可以直接这样拍：**
+
+[0:00–0:05]
+
+手机连续震动，三个通知叠上来：
+
+“Where should we park?”
+“What does the warranty cover?”
+“Found damage. Who do I tell?”
+
+[0:05–0:12]
+
+旁白：
+
+“Meet Sam. Every job depends on what’s in his head—and what’s on his phone.”
+
+画面：老板正在现场工作，被手机打断。随后出现同一个地址：42 Oak St。
+
+[0:12–0:23]
+
+分屏：Juno · Homeowner / Rex · Crew。
+
+屏幕问题：“What’s the temporary crew access code?”
+
+Juno:
+“I don’t have access to crew-only details.”
+
+切到 Rex，施工队用西语问：
+
+“¿Cuál es el código de acceso?”
+
+Rex:
+“Es 4417, luego numeral.”
+
+[0:23–0:30]
+
+旁白：
+
+“Crewbrain turns company knowledge into voice helpers—with the right access, only for as long as it’s needed.”
+
+画面：Crewbrain 标志，以及三组大字：
+
+ONE COMPANY BRAIN
+THE RIGHT ACCESS
+ACCESS THAT ENDS
+
+这里把门禁称为 **temporary crew access code**，观众更容易理解为什么屋主助手没有权限。
+
+整条 5 分钟视频，我会这样安排：
+
+| 时间 | 画面与演示 | 评委应该理解什么 |
+|---|---|---|
+| **0:00–0:30** | 上面的开场：重复电话、同一工地、两种权限 | 谁需要它，为什么有用，哪里特别 |
+| **0:30–1:05** | 拍保修卡 → 老板批准 → 公司脑里出现来源、版本和 Homeowners 锁；旁边有 Crew brief 和 Office-only price book | 公司脑存的是有来源、有权限的知识。这里第一次明确出现 **Powered by HydraDB** |
+| **1:05–1:45** | 老板用语音创建 Juno；creator 补问一个缺失信息；展示批准卡，老板批准，再生成分享链接/QR。Rex 用快速剪辑带过 | 创建助手只需要说清任务；老板控制对象、知识、动作和期限 |
+| **1:45–2:35** | Juno 回答保修问题并引用来源；Rex 用西语回答现场问题；施工队上传损坏照片，Rex 报障，老板收件箱出现记录 | 有知识支撑的语音服务，而且真的能完成动作 |
+| **2:35–3:05** | Juno 遇到未收录的问题 → 转给老板 → 老板回答并批准 → 新知识版本出现 → Juno 随后引用新版本 | 公司脑持续积累知识，老板负责确认事实 |
+| **3:05–4:05** | 完整证明权限：Juno 无权获取施工队门禁；检索结果不含 price book；跨公司测试快速展示；最后 Close job，再回到 Rex 继续问，访问已结束 | 权限在检索和生命周期上生效 |
+| **4:05–4:40** | 一张简单架构图，配真实请求或来源记录 | HydraDB、Claude、gpt-realtime 各自承担什么 |
+| **4:40–5:00** | 回到开场的老板：大家通过助手解决问题；试点邀请、网址、二维码 | 明确的用户价值和下一步 |
+
+其中，三个镜头值得花最多时间打磨。
+
+**① 语音创建时，让 creator 问一个有意义的问题。**
+
+老板：
+
+> “Create a helper for the Patels at 42 Oak Street. Help them with installation and warranty questions.”
+
+Creator：
+
+> “When should their access end?”
+
+老板：
+
+> “Thirty days after handover.”
+
+随后批准卡放大停留几秒：**Who / Knows / Can do / Ends**。这比连续展示配置页面更容易让评委理解“agent 在帮老板完成委派”。
+
+**② 报障后，一定切到老板收件箱。**
+
+施工队说：
+
+> “There’s damage near the vent. Send this photo to Sam.”
+
+Rex 完成报障后，切到记录：**42 Oak St、照片、问题描述、提交人、时间**。
+
+“已发送”只是一句话；收件箱里的真实结果才是 agentic capability 的证据。Juno 的 walkthrough request 可以作为补充，时间紧就集中拍好报障。
+
+**③ Close job 是全片高潮。**
+
+老板端点击 **Close job** → 切回已经打开的 Rex 聊天 → 再问一次 → 出现 **This helper has ended**。最后补一眼 site brief 已回到 Office only。
+
+这里要表达清楚：**结束后不能继续访问**。已经听到的信息不会被收回。
+
+HydraDB 的展示也应该贯穿前后：上传时显示来源和锁；回答时显示来源版本；权限测试时显示真实检索范围。**仅靠 Juno 口头拒绝，还不足以证明锁有效。** 最有说服力的是让评委看到 crew brief 和 price book 没有进入 Juno 的检索结果。结尾架构图再解释：HydraDB 提供受权限约束的知识，Claude 推理并调用动作，gpt-realtime 提供实时语音。
+
+拍摄上，建议用 **16:9 横屏、手机界面录屏为主体、英文字幕贯穿**。沿用页面的黑底、白字、黄色标签；每次只突出一个重点。保留两段真实语音对话的完整过程，其余等待可以剪短；界面概念动画明确标注，测试结果只用真实通过的记录。
+
+今天赶 4 点提交，我会优先完成：**开场 → 真实问答 → 照片报障结果 → Close job → 架构与结尾**。Drive 导入和第二种动作可留给后续精修。目标 3:40 导出、3:50 提交，给上传留出余量。
+
+结尾一句可以用：
+
+> **“Your company’s know-how, on every job—with the right access, for the right amount of time.”**
