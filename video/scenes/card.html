@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Caption card</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* Background for app segments. The phone (screen + frame) is composited by ffmpeg at the right. */
+.left { position: absolute; left: 120px; top: 170px; width: 1060px; }
+h2 { font-size: 118px; margin-top: 30px; line-height: .9; }
+.caption { font-size: 38px; line-height: 1.3; margin-top: 34px; color: var(--muted); max-width: 26ch; }
+.steps { position: absolute; left: 120px; top: 760px; display: flex; gap: 10px; }
+.step { font-family: var(--f-mono); font-weight: 700; font-size: 18px; letter-spacing: .08em; text-transform: uppercase; padding: 10px 16px; border: 2px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--paper); }
+.step.on { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.shadow { position: absolute; left: 1314px; top: 64px; width: 464px; height: 967px; border-radius: 64px; box-shadow: 0 40px 80px -30px rgba(10,20,40,.55), 24px 24px 0 rgba(29,95,196,.10); }
+.topbar { right: 680px; }
+</style></head>
+<body>
+<div class="topbar"><div class="brand"><span class="brand-mark"></span>Crewbrain</div><div class="label" id="who"></div></div>
+<div class="left">
+  <span class="tag"><span class="hole"></span><span id="kicker"></span></span>
+  <h2 id="headline"></h2>
+  <p class="caption" id="caption"></p>
+</div>
+<div class="steps" id="steps"></div>
+<div class="shadow"></div>
+<script>
+const q = new URLSearchParams(location.search);
+for (const k of ["kicker", "headline", "caption", "who"]) document.getElementById(k).textContent = q.get(k) || "";
+const steps = ["Build the brain", "Make helpers", "At work", "Prove the locks"];
+const cur = Number(q.get("step") || 0);
+document.getElementById("steps").innerHTML = steps.map((s, i) => `<span class="step ${i + 1 === cur ? "on" : ""}">${i + 1} · ${s}</span>`).join("");
+</script>
+</body></html>

@@ -1,0 +1,20 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Subtitle</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* Transparent full-frame subtitle overlay. mode=app: under the caption column (left); mode=scene: bottom center. */
+html, body { background: transparent !important; background-image: none !important; }
+.sub { position: absolute; bottom: 56px; display: flex; }
+.sub span { background: rgba(20,24,31,.88); color: #fff; font-family: var(--f-body); font-weight: 700; font-size: 36px; line-height: 1.3;
+  padding: 12px 22px; border-radius: 8px; box-decoration-break: clone; -webkit-box-decoration-break: clone; text-wrap: balance; }
+.app { left: 120px; width: 1080px; justify-content: flex-start; }
+.scene { left: 260px; right: 260px; justify-content: center; text-align: center; }
+</style></head>
+<body>
+<div class="sub" id="s"><span id="t"></span></div>
+<script>
+const q = new URLSearchParams(location.search);
+document.getElementById("t").textContent = q.get("text") || "";
+document.getElementById("s").classList.add(q.get("mode") || "scene");
+</script>
+</body></html>

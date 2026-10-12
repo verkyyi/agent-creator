@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Warranty card</title>
+<style>
+/* A photographed warranty card: card on a wood-ish workbench, slight rotation, soft light falloff. */
+html, body { margin: 0; width: 1200px; height: 900px; overflow: hidden; }
+body { background: radial-gradient(ellipse at 40% 30%, #a77b52 0%, #7a5434 60%, #4d321c 100%); display: grid; place-items: center; font-family: Georgia, "Times New Roman", serif; }
+body::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(92deg, rgba(0,0,0,.05) 0 3px, transparent 3px 19px); }
+.card { position: relative; width: 860px; height: 560px; background: linear-gradient(160deg, #fffdf7, #f1ece0); border-radius: 14px; transform: rotate(-3.5deg); box-shadow: 0 30px 50px rgba(0,0,0,.45), 0 4px 8px rgba(0,0,0,.3); padding: 40px 48px; box-sizing: border-box; color: #1b2430; }
+.card::after { content: ""; position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(115deg, rgba(255,255,255,.35), transparent 40%, rgba(0,0,0,.08)); pointer-events: none; }
+.top { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #e08a00; padding-bottom: 16px; }
+.logo { font-family: "Arial Black", Arial, sans-serif; font-size: 44px; letter-spacing: -1px; color: #0b3d6e; }
+.logo span { color: #e08a00; }
+.sun { width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle, #ffb300 40%, #e08a00 41%, #e08a00 55%, transparent 56%); }
+h1 { font-size: 34px; margin: 22px 0 14px; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: .5px; }
+.terms { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.term { border: 2px solid #0b3d6e; border-radius: 8px; padding: 12px 16px; }
+.term b { display: block; font-family: "Arial Black", Arial, sans-serif; font-size: 40px; color: #0b3d6e; }
+.term small { font-family: Arial, sans-serif; font-size: 18px; }
+.meta { font-family: "Courier New", monospace; font-size: 21px; line-height: 1.55; }
+.fine { position: absolute; bottom: 26px; left: 48px; right: 48px; font-family: Arial, sans-serif; font-size: 13px; color: #6b7280; }
+</style></head>
+<body>
+<div class="card">
+  <div class="top"><div class="logo">Sun<span>Peak</span> Solar</div><div class="sun"></div></div>
+  <h1>Solar Panel Limited Warranty</h1>
+  <div class="terms">
+    <div class="term"><b>25-YEAR</b><small>Performance warranty · ≥ 84.8% rated output at year 25</small></div>
+    <div class="term"><b>12-YEAR</b><small>Product warranty · materials and workmanship</small></div>
+  </div>
+  <div class="meta">Model: SP-400 Mono PERC 400 W<br>Serial: SP-400-88213<br>Installed by: Rivera Solar &amp; Electric<br>Install date: ____________</div>
+  <div class="fine">Register within 60 days at sunpeak.example/warranty. Warranty void if modules are installed by a non-certified installer. Keep this card with your records.</div>
+</div>
+</body></html>

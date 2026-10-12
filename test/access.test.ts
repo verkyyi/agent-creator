@@ -383,3 +383,19 @@ test("12. Write actions are gated: only a helper with log_issue can log an issue
   const inbox = (await get(sam, "api/inbox")).json.items;
   assert.ok(inbox.some((i: any) => i.kind === "issue" && i.agentId === rex && /rot/.test(i.text) && i.from.startsWith("Marco")));
 });
+
+test("13. Answers return to the asker; creator summarizes and drafts replies", async () => {
+  const sam = await signIn("sam");
+  const anita = await signIn("anita");
+  await post(sam, "api/creator/message", { text: "Make a helper for the Patels about their install" });
+  const p = (await post(sam, "api/creator/message", { text: "30 days after handover" })).json.proposal;
+  await post(sam, `api/agents/${p.agentId}/approve`, { rev: p.rev });
+  await post(anita, `api/agents/${p.agentId}/chat`, { text: "Do you offer financing with zero down?" });
+  const news = (await post(sam, "api/creator/message", { text: "What's new?" })).json;
+  assert.match(news.reply, /Anita asked Juno/);
+  const draft = (await post(sam, "api/creator/message", { text: "Tell Anita yes, we partner with a lender, details after inspection" })).json.replyDraft;
+  assert.ok(draft?.inboxId);
+  await post(sam, `api/inbox/${draft.inboxId}/answer`, { text: draft.text });
+  const hist = (await get(anita, `api/agents/${p.agentId}/history`)).json.messages;
+  assert.equal(hist.at(-1).action?.kind, "owner_answer");
+});

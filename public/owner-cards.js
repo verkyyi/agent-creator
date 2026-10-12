@@ -1,0 +1,236 @@
+// Inline chat cards for the owner's chat with Crewbrain, plus the composer's 📎 attach menu.
+import { api, h, toast, ICON, icon, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, scrollToEnd } from "./common.js";
+
+let ctx;
+const $ = (s) => document.querySelector(s);
+const add = (el) => { ctx.log.append(el); scrollToEnd(ctx.log); return el; };
+const rel = (p) => String(p || "").replace(/^\/+/, "");
+const lockLabel = (v) => (LOCKS.find((l) => l.v === v) || LOCKS[0]).label;
+const lockFromLabel = (label) => {
+  const t = String(label || "").toLowerCase();
+  if (/home|customer/.test(t)) return "customer";
+  if (/crew/.test(t)) return "crew";
+  return "internal";
+};
+const card = (cls, ...kids) => h("div", { class: "cb-card " + cls }, ...kids);
+const head = (ico, title, extra) => h("div", { class: "cb-head" }, ico ? icon(ico) : null, h("b", {}, title), extra || null);
+const note = (text) => add(h("div", { class: "sys-note" }, text));
+
+async function upload(path, form) {
+  try {
+    const res = await fetch(rel(path), { method: "POST", body: form, credentials: "same-origin" });
+    let data = {}; try { data = await res.json(); } catch {}
+    return { ok: res.ok, status: res.status, data };
+  } catch { return { ok: false, status: 0, data: { error: "Can't reach Crewbrain. Check your signal and try again." } }; }
+}
+
+/* ---------- card renderers ---------- */
+function shareCard(c) {
+  const a = c.agent || {}, links = c.links || [];
+  const name = a.name || "your helper";
+  const openAll = () => shareSheet(links, { title: `Send ${name}`, helperName: name, endsLabel: a.endsLabel || "", job: a.job || "" });
+  const rows = links.map((l) => {
+    const copy = h("button", { class: "btn small ghost", type: "button", onclick: async () => {
+      let ok = false; try { await navigator.clipboard.writeText(l.url); ok = true; } catch {}
+      copy.textContent = ok ? "Copied" : "Hold to copy"; setTimeout(() => (copy.textContent = "Copy"), 1600);
+    } }, "Copy");
+    return h("div", { class: "cb-row", "data-member": l.memberId },
+      h("div", { class: "cb-who" }, h("b", {}, l.name), h("span", { class: "cb-url" }, l.url)),
+      h("div", { class: "cb-acts" },
+        h("a", { class: "btn small", href: "sms:?&body=" + encodeURIComponent(`Here's your link for ${name}: ${l.url}`) }, "Text"), copy));
+  });
+  return add(card("share-card",
+    head("share", `Send ${name}`, a.endsLabel ? h("span", { class: "cb-sub" }, `Works until ${a.endsLabel}`) : null),
+    links.length ? h("div", { class: "cb-rows" }, rows) : h("p", { class: "cb-muted" }, "No links yet. Approve the helper first."),
+    links.length ? h("button", { class: "btn yellow block open-share-btn", type: "button", onclick: openAll }, h("span", { html: ICON.share, style: "display:inline-flex" }), "Open share options") : null));
+}
+
+function helpersCard(c) {
+  const list = c.helpers || [];
+  const PILL = ctx.PILL || {};
+  const rows = list.map((a) => {
+    const [pc, pt] = PILL[a.state] || ["awaiting", a.state || ""];
+    const ended = a.state === "expired" || a.state === "revoked";
+    const live = a.state === "active";
+    return h("div", { class: "cb-row cb-helper" + (ended ? " ended" : ""), "data-id": a.id },
+      h("div", { class: "cb-hl" }, h("span", { class: "avatar light" }, a.avatar || "🤖"),
+        h("div", { class: "cb-who" }, h("b", {}, a.name),
+          h("span", { class: "cb-muted" }, [a.audienceName ? `For ${a.audienceName}` : null, a.endsLabel ? (ended ? `Ended ${a.endsLabel}` : `Ends ${a.endsLabel}`) : null].filter(Boolean).join(" · "))),
+        h("span", { class: "pill " + pc }, pt)),
+      h("div", { class: "cb-acts" },
+        live ? h("button", { class: "btn small ghost", type: "button", onclick: () => ctx.sendCreator(`Send ${a.name}'s links`) }, "Share") : null,
+        h("a", { class: "btn small ghost", href: `a.html?id=${encodeURIComponent(a.id)}` }, "Open chat"),
+        !ended ? h("button", { class: "btn small ghost", type: "button", onclick: () => ctx.sendCreator(`Close ${a.name}`) }, "Close") : null));
+  });
+  return add(card("helpers-card", head("helpers", list.length ? `Your helpers (${list.length})` : "Your helpers"),
+    list.length ? h("div", { class: "cb-rows" }, rows) : h("p", { class: "cb-muted" }, "No helpers yet. Say who needs one.")));
+}
+
+function confirmCard(c) {
+  const go = h("button", { class: "btn block " + (c.danger ? "danger" : "yellow"), type: "button" }, c.confirmLabel || "Yes, do it");
+  const cancel = h("button", { class: "btn ghost block", type: "button" }, "Cancel");
+  const foot = h("div", { class: "cb-foot" }, go, cancel);
+  const el = add(card("confirm-card" + (c.danger ? " danger" : ""), head(c.danger ? "power" : "check", c.title || "Are you sure?"),
+    c.body ? h("p", {}, c.body) : null, foot));
+  cancel.onclick = () => { foot.replaceChildren(h("div", { class: "cb-muted" }, "Cancelled. Nothing changed.")); el.classList.add("done"); };
+  go.onclick = async () => {
+    go.disabled = true; cancel.disabled = true; const label = go.textContent; go.textContent = "Working on it…";
+    const req = c.request || {};
+    const r = await api(rel(req.path), req.body || {}, req.method || "POST");
+    if (!r.ok) { go.disabled = false; cancel.disabled = false; go.textContent = label; toast(r.data.error || "That didn't go through. Try again.", "err"); return; }
+    if (r.data.agent) ctx.upsertHelper(r.data.agent);
+    el.classList.add("done");
+    foot.replaceChildren(h("div", { class: "published" }, icon("check"), "Done"));
+    if (r.data.reply) ctx.log.append(h("div", { class: "msg in" }, r.data.reply));
+    else note("All done.");
+    scrollToEnd(ctx.log);
+  };
+  return el;
+}
+
+/** Editable knowledge card. save({title,text,sharing}) -> api result. */
+function knowledgeCard({ heading = "Check before saving", title = "", text = "", sharing = "internal", imageUrl, save }) {
+  const t = h("input", { type: "text", "aria-label": "Title", class: "cb-input" }); t.value = title;
+  const x = h("textarea", { "aria-label": "What it says", class: "cb-input", rows: 5 }); x.value = text;
+  const picker = lockPicker(sharing);
+  const btn = h("button", { class: "btn yellow block save-knowledge-btn", type: "button" }, "Save to brain");
+  const foot = h("div", { class: "cb-foot" }, btn);
+  const el = add(card("knowledge-card", head("brain", heading),
+    imageUrl ? h("img", { class: "cb-photo", src: imageUrl, alt: "Your photo" }) : null,
+    h("p", { class: "cb-muted" }, "Fix anything that's wrong. Helpers can't use it until you save it."),
+    h("label", { class: "cb-label" }, "Title", t),
+    h("label", { class: "cb-label" }, "What it says", x),
+    h("div", { class: "cb-label" }, "Who can see this", picker.el),
+    foot));
+  btn.onclick = async () => {
+    const vals = { title: t.value.trim(), text: x.value, sharing: picker.value };
+    if (!vals.text.trim()) { x.focus(); return; }
+    btn.disabled = true; btn.textContent = "Saving…";
+    const r = await save(vals);
+    if (!r.ok) { btn.disabled = false; btn.textContent = "Save to brain"; toast(r.data.error || "Couldn't save. Try again.", "err"); return; }
+    t.readOnly = x.readOnly = true; picker.el.classList.add("locked");
+    el.classList.add("done");
+    const lbl = r.data.item?.lockLabel || lockLabel(vals.sharing);
+    foot.replaceChildren(h("div", { class: "published" }, icon("check"), `Saved · ${lbl}`));
+  };
+  return el;
+}
+
+function knowledgeDraftCard(c) {
+  const req = c.request || {};
+  return knowledgeCard({ heading: "Save this to your brain?", title: c.title, text: c.text, sharing: c.sharing,
+    save: (v) => api(rel(req.path), { ...(req.bodyBase || {}), ...v }) });
+}
+
+function answerCard(c) {
+  const res = c.results || [];
+  if (!res.length) return null;
+  return add(h("div", { class: "answer-sources" }, h("span", { class: "cb-src-label" }, "From your brain"),
+    res.map((r) => h("button", { class: "src-chip", type: "button", onclick: () => openSheet(r.title || "Source",
+      h("div", { class: "stack" }, h("div", { class: "row-btns" }, lockChip(lockFromLabel(r.lockLabel), r.lockLabel)), r.section ? h("div", { class: "label" }, r.section) : null, h("div", { class: "quote excerpt" }, r.text || "")), { testid: "excerpt-sheet" }) },
+      lockChip(lockFromLabel(r.lockLabel), r.lockLabel), h("span", { class: "src-t" }, r.title + (r.section ? " · " + r.section : ""))))));
+}
+
+export function renderCard(c) {
+  if (!c || typeof c !== "object") return;
+  if (c.type === "share") return shareCard(c);
+  if (c.type === "helpers") return helpersCard(c);
+  if (c.type === "confirm") return confirmCard(c);
+  if (c.type === "knowledge_draft") return knowledgeDraftCard(c);
+  if (c.type === "answer") return answerCard(c);
+}
+
+/* ---------- attach menu ---------- */
+function progress(text) {
+  const el = add(h("div", { class: "cb-progress" }, h("div", { class: "spinner" }), h("span", {}, text)));
+  return { set: (t) => (el.lastChild.textContent = t), done: () => el.remove() };
+}
+
+async function onPhoto(file) {
+  let dataUrl;
+  try { dataUrl = await downscale(file); } catch { toast("Couldn't open that photo. Try taking it again.", "err"); return; }
+  ctx.log.append(h("div", { class: "msg out" }, h("img", { class: "photo", src: dataUrl, alt: "Your photo" }), "Photo"));
+  const p = progress("Reading your photo…");
+  const r = await api("api/brain/capture", { imageDataUrl: dataUrl });
+  p.done();
+  if (!r.ok || !r.data.draft) { note(r.data.error || "Couldn't read that photo. Try again with better light."); return; }
+  const d = r.data.draft;
+  knowledgeCard({ heading: "Here's what I read", title: d.title, text: d.text, sharing: d.suggestedSharing || "internal", imageUrl: dataUrl,
+    save: (v) => api(`api/brain/drafts/${encodeURIComponent(d.id)}/approve`, v) });
+}
+
+function onFile(file) {
+  const t = h("input", { type: "text", class: "cb-input", "aria-label": "Title" }); t.value = file.name.replace(/\.[^.]+$/, "");
+  const picker = lockPicker("internal");
+  const btn = h("button", { class: "btn yellow block", type: "button" }, "Save to brain");
+  const foot = h("div", { class: "cb-foot" }, btn);
+  const el = add(card("knowledge-card file-card", head("doc", file.name),
+    h("p", { class: "cb-muted" }, "Who should be able to see this file?"),
+    h("label", { class: "cb-label" }, "Title", t),
+    h("div", { class: "cb-label" }, "Who can see this", picker.el), foot));
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = "Uploading…";
+    const fd = new FormData(); fd.append("file", file); fd.append("title", t.value.trim() || file.name); fd.append("sharing", picker.value);
+    setTimeout(() => { if (btn.disabled && btn.isConnected) btn.textContent = "Reading the file…"; }, 1200);
+    const r = await upload("api/x/ingest/file", fd);
+    if (!r.ok) { btn.disabled = false; btn.textContent = "Save to brain"; toast(r.data.error || "Couldn't save that file. Try again.", "err"); return; }
+    el.classList.add("done"); t.readOnly = true;
+    foot.replaceChildren(h("div", { class: "published" }, icon("check"), `Saved · ${r.data.item?.lockLabel || lockLabel(picker.value)}`));
+  };
+}
+
+let rec = null;
+async function onVoice() {
+  if (rec) return rec.stop();
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { toast("Voice notes don't work in this browser. Type it instead.", "err"); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { toast("I need the microphone to record. Allow it and try again.", "err"); return; }
+  const mr = new MediaRecorder(stream); const chunks = [];
+  const time = h("span", { class: "mono" }, "0:00");
+  const stopB = h("button", { class: "btn danger small", type: "button" }, "Stop and save");
+  const el = add(card("voice-card", head("question", "Recording a voice note"), h("div", { class: "cb-rec" }, h("span", { class: "rec-dot" }), time, h("span", { class: "cb-muted" }, "up to 1 minute")), stopB));
+  const t0 = Date.now();
+  const tick = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); time.textContent = `0:${String(Math.min(s, 60)).padStart(2, "0")}`; if (s >= 60) stop(); }, 250);
+  const stop = () => { if (mr.state !== "inactive") mr.stop(); };
+  stopB.onclick = stop;
+  rec = { stop };
+  mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  mr.onstop = async () => {
+    clearInterval(tick); rec = null; stream.getTracks().forEach((t) => t.stop());
+    el.remove();
+    const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+    ctx.log.append(h("div", { class: "msg out" }, `Voice note · ${time.textContent}`));
+    const p = progress("Listening to your note…");
+    const fd = new FormData(); fd.append("audio", blob, "note." + ((mr.mimeType || "").includes("mp4") ? "m4a" : "webm"));
+    const r = await upload("api/x/ingest/voice-note", fd);
+    p.done();
+    if (!r.ok || !r.data.draft) { note(r.data.error || "Couldn't understand that note. Try again or type it."); return; }
+    knowledgeCard({ heading: "Here's what I heard", title: r.data.draft.title, text: r.data.draft.text, sharing: r.data.draft.sharing || "internal",
+      save: (v) => api("api/x/ingest/text", v) });
+  };
+  mr.start();
+}
+
+function wireAttach() {
+  const btn = $("#attach-owner-btn"), menu = $("#attach-menu");
+  if (!btn || !menu) return;
+  const set = (open) => { menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
+  btn.addEventListener("click", (e) => { e.stopPropagation(); set(menu.hidden); });
+  document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) set(false); });
+  menu.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-attach]"); if (!b) return;
+    set(false);
+    if (b.dataset.attach === "photo") $("#attach-photo-input").click();
+    if (b.dataset.attach === "file") $("#attach-file-input").click();
+    if (b.dataset.attach === "voice") onVoice();
+  });
+  $("#attach-photo-input").addEventListener("change", (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onPhoto(f); });
+  $("#attach-file-input").addEventListener("change", (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onFile(f); });
+}
+
+export function install(c) {
+  ctx = c;
+  window.__cbRenderCard = renderCard;
+  wireAttach();
+}

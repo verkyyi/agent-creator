@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Cracked flashing</title>
+<style>
+/* A phone snapshot of a cracked roof flashing around a vent pipe on asphalt shingles. */
+html, body { margin: 0; width: 900px; height: 1200px; overflow: hidden; }
+body { background:
+  repeating-linear-gradient(0deg, #3b3f44 0 4px, transparent 4px 90px),
+  repeating-linear-gradient(90deg, rgba(0,0,0,.25) 0 3px, transparent 3px 150px),
+  radial-gradient(circle at 30% 20%, #6b6f75, #44484d 70%, #2e3135);
+  position: relative; filter: contrast(1.05) saturate(.9); }
+body::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.5px); background-size: 7px 7px; }
+.flash { position: absolute; left: 210px; top: 380px; width: 480px; height: 480px; background: linear-gradient(140deg, #c9ccd0, #8d9196 60%, #b4b8bc); border-radius: 22px; transform: rotate(8deg) skewX(-6deg); box-shadow: 0 20px 30px rgba(0,0,0,.5); }
+.pipe { position: absolute; left: 330px; top: 470px; width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #e6e8ea, #9a9ea3 55%, #5d6166); box-shadow: inset 0 -12px 20px rgba(0,0,0,.4), 0 10px 20px rgba(0,0,0,.4); }
+.pipe::after { content: ""; position: absolute; inset: 50px; border-radius: 50%; background: radial-gradient(circle, #111 50%, #2a2a2a); }
+svg { position: absolute; left: 0; top: 0; }
+.stamp { position: absolute; left: 24px; bottom: 20px; font: 600 26px/1 Menlo, monospace; color: #ffd84d; text-shadow: 0 1px 2px #000; }
+</style></head>
+<body>
+<div class="flash"></div><div class="pipe"></div>
+<svg width="900" height="1200"><path d="M560 520 L600 560 L590 600 L640 650 L630 700 L690 760" stroke="#1a1a1a" stroke-width="7" fill="none" stroke-linejoin="round"/>
+<path d="M560 520 L600 560 L590 600 L640 650 L630 700 L690 760" stroke="#6b4a2a" stroke-width="2" fill="none" transform="translate(3,2)"/></svg>
+<div class="stamp">42 OAK ST · N VENT · 10/14</div>
+</body></html>

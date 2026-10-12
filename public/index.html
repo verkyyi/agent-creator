@@ -3,17 +3,22 @@
 <head>
 <script>/* slash-fix */if(/\/crewbrain$/.test(location.pathname))location.replace(location.pathname+"/"+location.search+location.hash)</script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Crewbrain</title>
-<meta name="description" content="Make scoped, expiring helpers for your customers and crews.">
-<meta name="theme-color" content="#14181f">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<!-- pwa:start -->
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#eef1f4">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1217">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Crewbrain">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<script type="module" src="pwa.js"></script>
+<!-- pwa:end -->
+<title>Crewbrain</title>
+<meta name="description" content="Make scoped, expiring helpers for your customers and crews.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap">
@@ -22,7 +27,20 @@
 <body class="owner">
 <header class="bar">
   <button class="brand" id="brand" type="button" aria-label="Crewbrain"><span class="brand-mark" aria-hidden="true"></span>Crewbrain</button>
-  <div class="tenant" id="tenant"><b id="tenant-name">&nbsp;</b><span id="member-name"></span></div>
+  <div class="bar-right">
+    <div class="tenant" id="tenant"><b id="tenant-name">&nbsp;</b><span id="member-name"></span></div>
+    <button class="back-chat" id="back-chat" type="button" hidden>Chat</button>
+    <button class="menu-btn more-btn" id="menu-btn" type="button" aria-label="More" aria-haspopup="true" aria-expanded="false"></button>
+  </div>
+  <div class="menu-pop" id="menu-pop" role="menu" hidden>
+    <button class="more-item" id="tab-create" role="menuitem" data-tab="create" type="button"><span data-icon="chat"></span>Chat with Crewbrain</button>
+    <button class="more-item" id="tab-helpers" role="menuitem" data-tab="helpers" type="button"><span data-icon="helpers"></span>My helpers</button>
+    <button class="more-item" id="tab-inbox" role="menuitem" data-tab="inbox" type="button"><span data-icon="inbox"></span>Inbox<span class="badge" id="inbox-badge" hidden>0</span></button>
+    <button class="more-item" id="tab-brain" role="menuitem" data-tab="brain" type="button"><span data-icon="brain"></span>Brain</button>
+    <hr class="menu-sep">
+    <button type="button" role="menuitem" id="how-btn">How it works</button>
+    <a role="menuitem" href="demo.html">Switch person (demo)</a>
+  </div>
   <div class="clock-pop" id="clock-pop" hidden>
     <div class="label">Demo clock</div>
     <button class="btn small" id="clock-advance" type="button">Skip ahead 1 day</button>
@@ -36,12 +54,20 @@
     <div class="chat-scroll" id="creator-log" aria-live="polite"></div>
     <form class="composer" id="composer" autocomplete="off">
       <div class="voice-state" id="voice-state" hidden></div>
+      <div class="attach-menu" id="attach-menu" role="menu" hidden>
+        <button type="button" role="menuitem" id="attach-photo-btn" data-attach="photo"></button>
+        <button type="button" role="menuitem" id="attach-file-btn" data-attach="file"></button>
+        <button type="button" role="menuitem" id="attach-voice-btn" data-attach="voice"></button>
+      </div>
+      <input id="attach-photo-input" type="file" accept="image/*" capture="environment" hidden>
+      <input id="attach-file-input" type="file" accept=".pdf,.txt,.md,.docx,.csv,application/pdf,text/plain,text/markdown,text/csv" hidden>
       <div class="comp-row">
-        <button class="mic" id="mic-btn" type="button" aria-label="Talk" aria-pressed="false"></button>
+        <button class="icon-btn attach" id="attach-owner-btn" type="button" aria-label="Add a photo, file or voice note" aria-haspopup="true" aria-expanded="false"></button>
         <div class="field-wrap">
-          <input id="composer-input" type="text" enterkeyhint="send" placeholder="Tell me who needs a helper…" aria-label="Message the creator">
+          <input id="composer-input" type="text" enterkeyhint="send" placeholder="Type or tap the mic…" aria-label="Message">
           <button class="icon-btn send" id="send-btn" type="submit" aria-label="Send" disabled></button>
         </div>
+        <button class="mic" id="mic-btn" type="button" aria-label="Tap and talk" aria-pressed="false"></button>
       </div>
     </form>
   </section>
@@ -56,22 +82,16 @@
   </section>
 
   <section class="view" id="view-helpers" data-view="helpers" hidden>
-    <div class="view-head"><div><h2>Helpers</h2><p>Who can talk to what, and until when.</p></div></div>
+    <div class="view-head"><div><h2>Helpers</h2><p>Who can use each helper, and when it shuts off.</p></div></div>
     <div class="cards" id="helper-list"></div>
   </section>
 
   <section class="view" id="view-inbox" data-view="inbox" hidden>
-    <div class="view-head"><div><h2>Inbox</h2><p>Questions, issues and walkthrough requests your helpers passed to you.</p></div></div>
+    <div class="view-head"><div><h2>Inbox</h2><p>Questions and problems your helpers passed to you.</p></div></div>
     <div id="inbox-list"></div>
   </section>
 </main>
 
-<nav class="tabbar" role="tablist" aria-label="Sections">
-  <button class="tab" id="tab-create" role="tab" data-tab="create" type="button"><span data-icon="chat"></span>Create</button>
-  <button class="tab" id="tab-brain" role="tab" data-tab="brain" type="button"><span data-icon="brain"></span>Brain</button>
-  <button class="tab" id="tab-helpers" role="tab" data-tab="helpers" type="button"><span data-icon="helpers"></span>Helpers</button>
-  <button class="tab" id="tab-inbox" role="tab" data-tab="inbox" type="button"><span data-icon="inbox"></span>Inbox<span class="badge" id="inbox-badge" hidden>0</span></button>
-</nav>
 <script type="module" src="owner.js"></script>
 </body>
 </html>

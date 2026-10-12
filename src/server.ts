@@ -8,6 +8,7 @@ import { DEMO_TOKENS } from "./seed.ts";
 import { hydraBoot, hydraIngest, hydraState, sharingFromLabel } from "./retrieval.ts";
 import * as core from "./core.ts";
 import { voiceRoutes } from "./voice.ts";
+import { brainRoutes } from "./brain.ts";
 import type { Member } from "./types.ts";
 
 type Env = { Variables: { member: Member } };
@@ -78,7 +79,7 @@ export function buildApp() {
     return { member: { id: m.id, name: m.name, role: m.role, tenantId: m.tenantId, tenantName: core.tenantOf(m.tenantId).name }, helpers: core.helpersFor(m) };
   }));
 
-  app.post("/api/creator/message", wrap(async (c) => core.creatorMessage(c.get("member"), String((await c.req.json()).text ?? ""))));
+  app.post("/api/creator/message", wrap(async (c) => core.creatorMessage(c.get("member"), String((await c.req.json()).text ?? ""), base(c))));
   app.get("/api/creator/log", wrap((c) => ({ messages: db.creatorLog[c.get("member").id] ?? [] })));
   app.post("/api/agents/:id/approve", wrap(async (c) => core.approve(c.get("member"), c.req.param("id")!, Number((await c.req.json()).rev), base(c))));
   app.post("/api/agents/:id/close", wrap((c) => core.closeAgent(c.get("member"), c.req.param("id")!)));
@@ -126,6 +127,8 @@ export function buildApp() {
   }));
 
   app.route("/api/voice", voiceRoutes);
+  app.route("/api/x", brainRoutes);
+  app.route("/api", brainRoutes);
 
   app.use("/*", serveStatic({ root: "./public" }));
   app.get("/", serveStatic({ path: "./public/index.html" }));

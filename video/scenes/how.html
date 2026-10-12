@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>How it works</title>
+<link rel="stylesheet" href="base.css">
+<style>
+.head { position: absolute; left: 120px; top: 160px; }
+h2 { font-size: 96px; margin-top: 18px; }
+.flow { position: absolute; left: 120px; right: 120px; top: 420px; display: grid; grid-template-columns: 240px 60px 1fr 60px 1.25fr 60px 1fr; align-items: stretch; }
+.box { background: var(--sheet); border: 3px solid var(--ink); border-radius: 14px; padding: 24px 24px 26px; box-shadow: 8px 8px 0 rgba(20,24,31,.12); }
+.box h3 { font-family: var(--f-display); font-weight: 800; font-size: 44px; text-transform: uppercase; margin: 6px 0 14px; line-height: .95; }
+.box ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.box li { font-size: 24px; line-height: 1.25; padding-left: 22px; position: relative; }
+.box li::before { content: ""; position: absolute; left: 0; top: 10px; width: 10px; height: 10px; background: var(--chalk); border-radius: 2px; }
+.box.brain { border-color: var(--chalk); border-width: 4px; background: #f7faff; }
+.box.brain h3 { color: var(--chalk); }
+.phone { background: var(--phone); color: var(--phone-fg); border-radius: 34px; padding: 26px 20px; border: 0; display: grid; align-content: center; justify-items: center; text-align: center; gap: 14px; }
+.phone .ico { font-size: 64px; }
+.phone h3 { color: #fff; }
+.phone .label { color: #9aa5b3; font-size: 18px; }
+.arrow { display: grid; place-items: center; }
+.arrow svg { width: 52px; height: 30px; }
+.locks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.lock { font-size: 17px; }
+.voice { position: absolute; left: 120px; right: 120px; top: 830px; height: 90px; border: 3px dashed var(--chalk); border-top: 0; border-radius: 0 0 24px 24px; display: flex; align-items: flex-end; justify-content: center; }
+.voice span { background: var(--paper); padding: 0 20px; transform: translateY(22px); font-family: var(--f-mono); font-weight: 700; font-size: 26px; color: var(--chalk); }
+</style></head>
+<body>
+<div class="topbar"><div class="brand"><span class="brand-mark"></span>Crewbrain</div><div class="label">How it works</div></div>
+<div class="head"><span class="tag up" style="animation-delay:.2s"><span class="hole"></span>Under the hood</span>
+  <h2 class="up" style="animation-delay:.5s">Policy first. Then the brain.</h2></div>
+<div class="flow">
+  <div class="box phone up" style="animation-delay:2s"><div class="ico">📱</div><h3>Phone</h3><div class="label">voice or text<br>personal link</div></div>
+  <div class="arrow in" style="animation-delay:3s"><svg viewBox="0 0 52 30"><path d="M2 15h40M34 5l12 10-12 10" stroke="#14181f" stroke-width="4" fill="none"/></svg></div>
+  <div class="box up" style="animation-delay:3.4s"><div class="label">Server</div><h3>Policy checks</h3>
+    <ul><li>Who is asking</li><li>Which helper</li><li>Still active? Not expired or closed</li></ul></div>
+  <div class="arrow in" style="animation-delay:7s"><svg viewBox="0 0 52 30"><path d="M2 15h40M34 5l12 10-12 10" stroke="#14181f" stroke-width="4" fill="none"/></svg></div>
+  <div class="box brain up" style="animation-delay:7.5s"><div class="label">HydraDB</div><h3>Company brain</h3>
+    <ul><li>One database per company</li><li>Access list on every source</li><li>Search runs as the audience</li><li>Changes apply instantly</li></ul>
+    <div class="locks"><span class="lock office">🔒 Office only</span><span class="lock crew">🔒 Crew · 42 Oak St</span><span class="lock home">🔒 Homeowners</span></div></div>
+  <div class="arrow in" style="animation-delay:17s"><svg viewBox="0 0 52 30"><path d="M2 15h40M34 5l12 10-12 10" stroke="#14181f" stroke-width="4" fill="none"/></svg></div>
+  <div class="box up" style="animation-delay:17.5s"><div class="label">Anthropic</div><h3>Claude</h3>
+    <ul><li>Reasons over allowed items only</li><li>Cites its sources</li><li>Takes approved actions: log issue, request walkthrough</li></ul></div>
+</div>
+<div class="voice in" style="animation-delay:21s"><span>◀ OpenAI gpt-realtime voice back to the phone</span></div>
+</body></html>

@@ -1,14 +1,39 @@
 {
+  "id": "./",
   "name": "Crewbrain",
   "short_name": "Crewbrain",
-  "description": "Scoped, expiring helpers for your customers and crews.",
+  "description": "Make scoped, expiring helpers for your customers and crews — they know your business and only what you allow.",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#14181f",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#0b0e12",
   "theme_color": "#14181f",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%2314181f'/%3E%3Ccircle cx='256' cy='256' r='130' fill='none' stroke='%23eef1f4' stroke-width='40'/%3E%3Ccircle cx='256' cy='256' r='50' fill='%23f5c400'/%3E%3C/svg%3E", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "New helper",
+      "short_name": "New helper",
+      "description": "Make a new helper",
+      "url": "./#create",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Inbox",
+      "short_name": "Inbox",
+      "description": "See what your helpers need from you",
+      "url": "./#inbox",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

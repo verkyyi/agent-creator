@@ -3,10 +3,20 @@
 <head>
 <script>/* slash-fix */if(/\/crewbrain$/.test(location.pathname))location.replace(location.pathname+"/"+location.search+location.hash)</script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Try Crewbrain</title>
-<meta name="theme-color" content="#14181f">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<!-- pwa:start -->
 <link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#eef1f4">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1217">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Crewbrain">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<script type="module" src="pwa.js"></script>
+<!-- pwa:end -->
+<title>Try Crewbrain</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,28 +24,41 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body class="demo">
-<header class="bar"><span class="brand"><span class="brand-mark" aria-hidden="true"></span>Crewbrain</span><span class="tenant"><b>Demo</b>for judges</span></header>
+<header class="bar"><span class="brand"><span class="brand-mark" aria-hidden="true"></span>Crewbrain</span><span class="tenant"><b>Demo</b>2-minute tour</span></header>
 <div class="demo-wrap">
-  <span class="tag" style="justify-self:start"><span class="hole"></span>Pick who you are</span>
-  <h1>Try <span class="chalk">Crewbrain</span></h1>
-  <p class="muted">Each button signs this browser in as one person. Start as Sam, the owner, then open the homeowner or crew link on another phone to see what they can — and can't — see.</p>
-  <div id="ids" style="display:grid;gap:.75rem"><div class="reading"><div class="spinner"></div>Loading…</div></div>
+  <h1>Try Crewbrain <span class="chalk">as…</span></h1>
+  <p class="demo-lede">A 2-minute tour. Start as <b>Sam</b>, the owner: make a helper by talking, approve it, and send the links. Then come back here and open it as the homeowner or the crew to see what they can, and can't, see.</p>
+  <div id="ids" class="id-list"><div class="reading"><div class="spinner"></div>Loading…</div></div>
 </div>
 <script type="module">
-import { api, h } from "./common.js";
-const ROLE = { owner: "🧰", customer: "🏡", crew: "🦺" };
+import { api, h, ICON } from "./common.js";
+const CARDS = [
+  { match: /^sam/i, avatar: "owner", title: "Sam", sub: "The owner", d: "Run the company. Make helpers, approve them, close jobs.", primary: true },
+  { match: /^anita/i, avatar: "🏡", title: "Anita", sub: "Homeowner", d: "Ask about her new solar and battery install." },
+  { match: /^marco/i, avatar: "🦺", title: "Marco", sub: "Roofing crew", d: "Gets the job briefing on site. Try Spanish." },
+  { match: /^zed/i, avatar: "deny", title: "Zed", sub: "Not invited", d: "See the helper refuse someone it wasn't made for." },
+  { match: /^gail/i, avatar: "other", title: "Gail", sub: "Another company", d: "Owns a different company, so she sees nothing of Sam's." },
+];
+const SVG = {
+  owner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h16v10H4z"/><path d="M9 9V6h6v3M4 13h16"/></svg>',
+  deny: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/></svg>',
+  other: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20V8l6-4v16M10 20h10V10h-10M13 13h4M13 16h4"/></svg>',
+};
+const rel = (u) => { const m = /\/(i\/[^/?#]+)/.exec(u || ""); return m ? m[1] : u; };
 const el = document.getElementById("ids");
 const r = await api("api/demo/identities");
 el.innerHTML = "";
 const ids = (r.ok && r.data.identities) || [];
-if (!ids.length) el.append(h("div", { class: "empty" }, "Demo identities aren't available right now."));
-for (const i of ids) {
-  const icon = ROLE[i.role] || (/crew|roof/i.test(i.name + i.description) ? "🦺" : "🏡");
-  el.append(h("a", { class: "id-btn", href: i.url, "data-role": i.role, "data-testid": "identity" },
-    h("span", { class: "avatar lg light role" }, i.role === "owner" ? "🧰" : icon),
-    h("b", {}, i.name),
+if (!ids.length) el.append(h("div", { class: "empty" }, "The demo people aren't available right now. Reload the page in a moment."));
+for (const c of CARDS) {
+  const i = ids.find((x) => c.match.test(x.name));
+  if (!i) continue;
+  const av = SVG[c.avatar] ? h("span", { class: "avatar lg light role ico-av " + c.avatar, html: SVG[c.avatar] }) : h("span", { class: "avatar lg light role" }, c.avatar);
+  el.append(h("a", { class: "id-btn" + (c.primary ? " primary" : ""), href: rel(i.url), "data-role": i.role, "data-testid": "identity" },
+    av,
+    h("b", {}, c.title, h("small", {}, c.sub)),
     h("span", { class: "go", "aria-hidden": "true" }, "→"),
-    h("span", { class: "d" }, i.description || i.role)));
+    h("span", { class: "d" }, c.d)));
 }
 </script>
 </body>

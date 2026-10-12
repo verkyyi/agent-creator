@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crewbrain · Offline</title>
+<meta name="theme-color" content="#14181f">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<style>
+  :root { --bg: #0b0e12; --fg: #e9edf2; --muted: #9fb0c4; --tag: #f5c400; --tag-ink: #1a1500; --line: #1f2731; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 1.0625rem; line-height: 1.5;
+    display: grid; place-items: center;
+    padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  main { max-width: 26rem; width: 100%; text-align: left; }
+  .mark { width: 72px; height: 72px; display: block; margin-bottom: 28px; }
+  .label { font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  h1 { font-family: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif; font-weight: 900; text-transform: uppercase; font-size: 2.6rem; line-height: .95; margin: 0 0 16px; }
+  p { margin: 0 0 14px; color: var(--fg); }
+  p.muted { color: var(--muted); }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+  button, a.btn {
+    min-height: 48px; padding: 0 22px; border-radius: 6px; font: inherit; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer;
+  }
+  button { background: var(--tag); color: var(--tag-ink); border: 0; }
+  a.btn { background: transparent; color: var(--fg); border: 2px solid var(--line); }
+  button:focus-visible, a.btn:focus-visible { outline: 3px solid var(--tag); outline-offset: 3px; }
+  .rule { height: 6px; width: 64px; background: repeating-linear-gradient(-45deg, var(--tag) 0 8px, transparent 8px 16px); margin: 0 0 22px; }
+</style>
+</head>
+<body>
+<main>
+  <svg class="mark" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#14181f"/><circle cx="256" cy="256" r="150" fill="none" stroke="#eef1f4" stroke-width="44"/><circle cx="256" cy="256" r="58" fill="#f5c400" stroke="#eef1f4" stroke-width="24"/></svg>
+  <p class="label">No connection</p>
+  <h1>You're offline</h1>
+  <div class="rule" aria-hidden="true"></div>
+  <p>This page hasn't been saved on your phone yet, so it can't open without the internet.</p>
+  <p class="muted">Pages you've already opened still work. Anything you send while offline goes out as soon as you're back.</p>
+  <div class="actions">
+    <button type="button" id="retry">Try again</button>
+    <a class="btn" href="./">Go to my helpers</a>
+  </div>
+</main>
+<script>
+  document.getElementById("retry").addEventListener("click", function () { location.reload(); });
+  window.addEventListener("online", function () { location.reload(); });
+</script>
+</body>
+</html>
