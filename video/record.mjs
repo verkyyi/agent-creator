@@ -311,7 +311,7 @@ if (want(5)) {
     const r = await openPersona(anita());
     await step("ask warranty", () => send(r.page, "What does my panel warranty cover?", "/chat"));
     await sleep(3500);
-    await step("ask battery", () => send(r.page, "Can we add a second battery later on?", "/chat"));
+    await step("ask battery", () => send(r.page, "Could you also add an EV charger in our garage?", "/chat"));
     await sleep(3000);
     await r.finish("seg-5-a-juno");
   });
