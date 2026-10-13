@@ -3,7 +3,7 @@ import { aclFor, graphQuery, hydraFeedback, hydraIngest, hydraReady, hydraSetAcl
 import { claude, llmStatus } from "./llm.ts";
 import { remember, recall, forgetAgent } from "./memory.ts";
 import { ask as askBrain } from "./brain.ts";
-import type { Agent, AgentConfig, Member, Revision, Source, Template, Group, Cite, Sharing } from "./types.ts";
+import type { Agent, AgentConfig, Member, Revision, Source, Template, Group, Cite, Sharing, InboxRec } from "./types.ts";
 
 export class HttpError extends Error {
   constructor(public status: number, public body: Record<string, unknown>) { super(String(body.error)); }
@@ -180,14 +180,20 @@ export async function creatorMessage(owner: Member, text: string, base = "./"): 
     const lines = open.slice(-4).reverse().map((i) => i.kind === "issue"
       ? `${helperName(i.agentId)} logged a problem from ${first(i.fromId)}: ${i.text.replace(/[.!]+$/, "")}${i.imageDataUrl ? ", with a photo" : ""}`
       : i.kind === "walkthrough" ? `${first(i.fromId)} asked ${helperName(i.agentId)} for a walkthrough`
+      : i.kind === "relay" ? `${first(i.fromId)} wants to tell ${householdLabel(groupById(i.targetGroupId ?? ""))}: ${i.text.replace(/[.!]+$/, "")}`
       : `${first(i.fromId)} asked ${helperName(i.agentId)}: ${i.text.replace(/[?.!]+$/, "")}?`);
     const n = open.length === 1 ? "One thing" : open.length === 2 ? "Two things" : `${open.length} things`;
-    return say(`${n}. ${lines.join(". ")}. Want to reply to anyone?`);
+    const relays = open.filter((i) => i.kind === "relay").map((i) => inboxView(i));
+    const reply = `${n}. ${lines.join(". ")}. ${relays.length ? "Nothing reaches the homeowners until you approve. " : ""}Want to reply to anyone?`;
+    log(owner, "creator", reply);
+    save();
+    return relays.length ? { reply, card: { type: "relays", items: relays } } : { reply };
   }
   const tell = /^(?:tell|reply to|answer|let)\s+([a-z]+)\s*(?:that|know that|know)?[,:]?\s*(.*)$/i.exec(text.trim());
   if (tell) {
     const who = tell[1].toLowerCase();
-    const item = open.slice().reverse().find((i) => first(i.fromId).toLowerCase() === who);
+    // A relay is approved on its card, never by a spoken reply (that would send the owner's note to the household).
+    const item = open.slice().reverse().find((i) => i.kind !== "relay" && first(i.fromId).toLowerCase() === who);
     if (item) {
       let reply = tell[2].trim();
       const polished = await claude("You turn a contractor owner's quick spoken note into one or two short, friendly sentences to send to their customer or crew member. Keep every fact, add none. Output only the message.", `Question from ${first(item.fromId)}: ${item.text}\nOwner's note: ${reply}`, { timeoutMs: 12000 });
@@ -425,6 +431,52 @@ export function publicInfo(m: Member, agentId: string) {
 const ISSUE = /\b(log|report|found|broken|damaged?|issue|problem|leak|rot|rotten|crack|cracked|missing)\b|podrid|roto|problema|fuga/i;
 const WALK = /\b(walk-?through|walk me|visit|come by|meet|appointment)\b/i;
 
+// ---------- crew → homeowner updates (owner approves before anything is delivered) ----------
+const WHO_HOME = String.raw`(?:the\s+)?(?:home\s?owners?|house\s?owners?|household|patel\s+family|patels?|family|customers?|clients?|anita(?:\s+and\s+raj)?|raj)`;
+export const RELAY = new RegExp(String.raw`\b(?:tell|let|inform|notify|message|text|update)\s+${WHO_HOME}\b|\bav[ií]s(?:a|ale|ales)\b|\bd[ií]les?\s+a\s+(?:la|el|los)\s+(?:due[ñn]|familia|cliente)|\binf[oó]rmales?\b`, "i");
+function relayBody(said: string) {
+  return said.trim()
+    .replace(new RegExp(String.raw`^(?:hey\s+\w+[,!]?\s*)?(?:(?:can|could|would)\s+you\s+|please\s+)?(?:tell|let|inform|notify|message|text|update)\s+${WHO_HOME}\s*(?:know\s*)?(?:that\s*)?[,:]?\s*`, "i"), "")
+    .replace(/^(?:por favor,?\s*)?(?:av[ií]s(?:a|ale|ales)|d[ií]les?|inf[oó]rmales?)\s+(?:a\s+)?(?:la|el|los|las)?\s*(?:due[ñn][oa]s?|familia|clientes?|propietari[oa]s?)?\s*(?:de la casa\s*)?(?:que\s*)?[,:]?\s*/i, "")
+    .trim();
+}
+// Prices and codes never travel to a homeowner, whoever typed them.
+export const scrubUpdate = (s: string) => s
+  .replace(/\$\s?\d[\d,]*(?:\.\d+)?k?/gi, "[price removed]")
+  .replace(/\b(code|c[oó]digo|password|contrase[ñn]a)(\s+(?:is|es))?[\s:#]*\d{3,}#?/gi, "$1 [removed]")
+  .replace(/\b(?!(?:19|20)\d\d\b)\d{4,}#?/g, "[removed]");
+export function householdLabel(g?: Group) {
+  if (!g) return "the household";
+  const m = /^(\w+)\s+household$/i.exec(g.name);
+  return m ? `the ${m[1]}s` : `the ${g.name}`;
+}
+const householdFor = (a: Agent, c: AgentConfig) => db.groups.find((g) => g.tenantId === a.tenantId && g.kind === "household" && !!g.jobId && g.jobId === c.jobId);
+function householdHelpers(tenantId: string, g: Group) {
+  return db.agents.filter((a) => a.tenantId === tenantId && a.templateId === "homeowner_helper" && lifecycle(a) === "active" &&
+    !!g.jobId && groupById(active(a)!.config.audienceGroupId)?.jobId === g.jobId);
+}
+
+/** Draft + file a relay. Callers have already checked the tool is in the ACTIVE revision. */
+export async function fileRelay(a: Agent, c: AgentConfig, m: Member, said: string, via?: "voice") {
+  const g = householdFor(a, c);
+  const body = relayBody(said).slice(0, 600);
+  if (!g) return { ok: false as const, reason: "no_household" };
+  if (!body) return { ok: false as const, reason: "empty" };
+  const crew = groupById(c.audienceGroupId);
+  const tenant = tenantOf(a.tenantId);
+  const llm = await claude(
+    `You turn a construction crew member's quick note into a short, polite update for a homeowner, sent by ${tenant.name}. Write one or two plain English sentences (translate if the note is in Spanish). Keep every fact exactly as given (times, days, places); add no facts, promises, apologies or reasons that are not in the note. Never include prices, costs, codes, gate codes, passwords or internal details. No greeting, no sign-off. Output only the message.`,
+    `Crew: ${crew?.name ?? "the crew"}\nHousehold: ${g.name}\nNote: ${body}`, { timeoutMs: 12000 });
+  const plain = body.charAt(0).toLowerCase() + body.slice(1);
+  const draft = scrubUpdate((llm?.trim() || `The ${crew?.name ?? "crew"} says: ${plain}`).replace(/([^.!?])$/, "$1."));
+  ensureLive(db.agents.find((x) => x.id === a.id)!); // closed while drafting: nothing is filed
+  const item = { id: id("inb"), tenantId: a.tenantId, kind: "relay" as const, agentId: a.id, fromId: m.id, text: draft, original: said.slice(0, 1000), targetGroupId: g.id, status: "open" as const, createdAt: now().toISOString() };
+  db.inbox.push(item);
+  record({ tenantId: a.tenantId, actorId: m.id, agentId: a.id, kind: "action.notify_homeowner", detail: { inbox: item.id, to: g.id, ...(via ? { via } : {}) } });
+  save();
+  return { ok: true as const, item, group: g };
+}
+
 // Progress events for the streaming route; the non-stream caller passes none.
 export type ChatEvent = (name: "status" | "sources" | "action", data: Record<string, unknown>) => void;
 
@@ -448,6 +500,17 @@ export async function chat(m: Member, agentId: string, text: string, imageDataUr
   };
 
   // Write actions, gated outside the model: the tool must be in the approved revision.
+  if (c.tools.includes("action.notify_homeowner") && !imageDataUrl && RELAY.test(text)) {
+    const ownerFirst = memberById(a.ownerId)!.name.split(" ")[0];
+    const es = /[¿¡ñ]|\b(av[ií]s|d[ií]le|que|la|el|los|ma[ñn]ana)\b/i.test(text);
+    const r = await fileRelay(a, c, m, text);
+    if (!r.ok) {
+      return done({ reply: r.reason === "empty"
+        ? (es ? "¿Qué quieres que le diga a la familia?" : "What should I tell the homeowner?")
+        : (es ? `No veo una familia en este trabajo. Pregúntale a ${ownerFirst}.` : `There's no household on this job for me to update. Ask ${ownerFirst}.`) });
+    }
+    return done({ reply: es ? `Le mandé tu aviso a ${ownerFirst} para que lo apruebe.` : `I've sent your update to ${ownerFirst} to approve.`, action: { kind: "relay_requested", summary: r.item.text } });
+  }
   if (c.tools.includes("action.log_issue") && (imageDataUrl || ISSUE.test(text))) {
     const item = { id: id("inb"), tenantId: a.tenantId, kind: "issue" as const, agentId: a.id, fromId: m.id, text: text || "Photo from the job site", imageDataUrl, status: "open" as const, createdAt: now().toISOString() };
     db.inbox.push(item);
@@ -572,16 +635,56 @@ export async function approveCapture(owner: Member, capId: string, body: { title
 export function inbox(owner: Member) {
   if (owner.role !== "owner") throw new HttpError(403, { error: "forbidden" });
   return {
-    items: db.inbox.filter((i) => i.tenantId === owner.tenantId).slice().reverse().map((i) => ({
-      id: i.id, kind: i.kind, agentId: i.agentId, agentName: cfgOf(db.agents.find((a) => a.id === i.agentId)!).name,
-      from: memberById(i.fromId)?.name ?? "", text: i.text, imageDataUrl: i.imageDataUrl, status: i.status, createdAt: i.createdAt,
-    })),
+    items: db.inbox.filter((i) => i.tenantId === owner.tenantId).slice().reverse().map(inboxView),
   };
+}
+
+function inboxView(i: InboxRec) {
+  const base = {
+    id: i.id, kind: i.kind, agentId: i.agentId, agentName: cfgOf(db.agents.find((a) => a.id === i.agentId)!).name,
+    from: memberById(i.fromId)?.name ?? "", text: i.text, imageDataUrl: i.imageDataUrl, status: i.status, createdAt: i.createdAt,
+  };
+  if (i.kind !== "relay") return base;
+  const g = groupById(i.targetGroupId ?? "");
+  const helpers = g ? householdHelpers(i.tenantId, g) : [];
+  return { ...base, original: i.original, targetGroupId: i.targetGroupId, targetName: g?.name ?? "", targetLabel: householdLabel(g),
+    deliverable: helpers.length > 0, viaHelpers: helpers.map((a) => active(a)!.config.name) };
+}
+
+// Owner-approved crew → household update: lands in every live household helper thread for that job.
+function approveRelay(owner: Member, i: InboxRec, text: string) {
+  const g = groupById(i.targetGroupId ?? "");
+  const body = (text.trim() || i.text).slice(0, 1000);
+  const helpers = g ? householdHelpers(i.tenantId, g) : [];
+  if (!g || !helpers.length) {
+    record({ tenantId: owner.tenantId, actorId: owner.id, kind: "relay.undeliverable", detail: { id: i.id } });
+    throw new HttpError(409, { error: "no_household_helper", reply: `${g ? `The ${g.name}` : "That household"} has no live helper yet, so there's nowhere to send this. It stays in your inbox.` });
+  }
+  const tenant = tenantOf(i.tenantId);
+  const at = now().toISOString();
+  const delivered: string[] = [];
+  for (const a of helpers) {
+    for (const mid of groupById(active(a)!.config.audienceGroupId)!.memberIds) {
+      (db.chatLog[`${a.id}:${mid}`] ??= []).push({ role: "helper", text: `Update from ${tenant.name}: ${body}`, at, action: { kind: "owner_update", summary: body } });
+      delivered.push(mid);
+    }
+  }
+  i.status = "answered";
+  i.answer = body;
+  (db.chatLog[`${i.agentId}:${i.fromId}`] ??= []).push({ role: "helper", text: `${owner.name.split(" ")[0]} approved your update and sent it to the ${g.name}.`, at, action: { kind: "relay_sent", summary: body } });
+  record({ tenantId: owner.tenantId, actorId: owner.id, kind: "relay.approved", detail: { id: i.id, edited: body !== i.text } });
+  record({ tenantId: owner.tenantId, actorId: owner.id, kind: "relay.delivered", detail: { id: i.id, group: g.id, agents: helpers.map((a) => a.id), members: [...new Set(delivered)] } });
+  save();
+  return { item: inbox(owner).items.find((x) => x.id === i.id), delivered: { group: g.name, members: [...new Set(delivered)].map((mid) => memberById(mid)?.name ?? mid) } };
 }
 
 export function answerInbox(owner: Member, iid: string, text: string, sharing: Sharing = "customer") {
   const i = db.inbox.find((x) => x.id === iid && x.tenantId === owner.tenantId);
   if (!i || owner.role !== "owner") throw new HttpError(404, { error: "not_found" });
+  if (i.kind === "relay") {
+    if (i.status !== "open") throw new HttpError(409, { error: "already_closed", reply: "This update was already handled." });
+    return approveRelay(owner, i, text);
+  }
   i.status = "answered";
   i.answer = text;
   // The person who asked hears back in their own chat.
@@ -625,6 +728,7 @@ export function dismissInbox(owner: Member, iid: string) {
   const i = db.inbox.find((x) => x.id === iid && x.tenantId === owner.tenantId);
   if (!i || owner.role !== "owner") throw new HttpError(404, { error: "not_found" });
   i.status = "dismissed";
+  if (i.kind === "relay") record({ tenantId: owner.tenantId, actorId: owner.id, kind: "relay.declined", detail: { id: iid } });
   save();
   return { item: inbox(owner).items.find((x) => x.id === iid) };
 }

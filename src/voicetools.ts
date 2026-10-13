@@ -4,7 +4,7 @@
 // revision's tools → retrieval as the audience over the approved sources → re-check lifecycle.
 import { db, now, id, record, save } from "./store.ts";
 import { search, principalsFor } from "./retrieval.ts";
-import { openAgent, publicInfo, groupById, memberById, lifecycle } from "./core.ts";
+import { openAgent, publicInfo, groupById, memberById, lifecycle, fileRelay } from "./core.ts";
 import type { Agent, Cite, Member } from "./types.ts";
 
 export const SEARCH_TOOL = {
@@ -46,9 +46,22 @@ export const WALKTHROUGH_TOOL = {
   },
 } as const;
 
+export const NOTIFY_HOMEOWNER_TOOL = {
+  type: "function",
+  name: "notify_homeowner",
+  description: "Send the job's homeowners a short update the crew member asks for (e.g. arrival time, dumpster drop). It is drafted and goes to the owner to approve; nothing reaches the homeowner until the owner approves.",
+  parameters: {
+    type: "object",
+    properties: { message: { type: "string", description: "The update in the user's own words, facts only (no prices or codes)." } },
+    required: ["message"],
+    additionalProperties: false,
+  },
+} as const;
+
 const ACTION_TOOLS: Record<string, { configId: string; def: object }> = {
   log_issue: { configId: "action.log_issue", def: LOG_ISSUE_TOOL },
   request_walkthrough: { configId: "action.request_walkthrough", def: WALKTHROUGH_TOOL },
+  notify_homeowner: { configId: "action.notify_homeowner", def: NOTIFY_HOMEOWNER_TOOL },
 };
 
 const activeCfg = (a: Agent) => a.revisions.find((r) => r.rev === a.activeRev)?.config;
@@ -132,6 +145,16 @@ export async function runVoiceTool(m: Member, agentId: string, name: string, arg
   if (!c.tools.includes(action.configId)) {
     record({ tenantId: a.tenantId, actorId: m.id, agentId: a.id, kind: "access.denied", detail: { reason: "tool", tool: action.configId, via: "voice" } });
     return { error: "not_allowed", note: `This helper can't do that. Offer to pass the request to ${ownerFirst}.` };
+  }
+  if (name === "notify_homeowner") {
+    const message = String(args?.message ?? "").slice(0, 1000).trim();
+    if (!message) return { error: "bad_args", note: "Ask the user what the homeowner should be told." };
+    let r;
+    try { r = await fileRelay(a, c, m, message, "voice"); } catch { return fresh() ?? ENDED; }
+    if (!r.ok) return { error: r.reason, note: r.reason === "no_household" ? `There's no household on this job. Offer to pass it to ${ownerFirst}.` : "Ask the user what the homeowner should be told." };
+    const act = { kind: "relay_requested", summary: r.item.text };
+    lastTurn.set(key, { citations: lastTurn.get(key)?.citations ?? [], action: act });
+    return { ok: true, action: act, note: `Drafted and sent to ${ownerFirst} to approve. Tell the user: "I've sent your update to ${ownerFirst} to approve." Nothing reaches the homeowner until ${ownerFirst} approves.` };
   }
   const text = String((name === "log_issue" ? args?.description : args?.note) ?? "").slice(0, 1000).trim() || (name === "log_issue" ? "Issue reported by voice" : "Walkthrough requested by voice");
   const late = fresh();

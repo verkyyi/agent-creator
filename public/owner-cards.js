@@ -139,8 +139,53 @@ function answerCard(c) {
       h("span", { class: "src-t" }, `Related: ${r.title}${r.relation ? ` (${r.relation})` : ""}`)))));
 }
 
+/** Approval card for a crew → household update (inbox item kind "relay"). Returns the element; caller places it. */
+export function relayCard(it, { onDone } = {}) {
+  const who = it.targetName || "household";
+  const ta = h("textarea", { class: "cb-input relay-text", rows: 4, "aria-label": `Message to the ${who}` }); ta.value = it.text || "";
+  const ok = h("button", { class: "btn yellow block relay-approve-btn", type: "button" }, "Approve and send");
+  const no = h("button", { class: "btn ghost block relay-decline-btn", type: "button" }, "Not now");
+  const foot = h("div", { class: "cb-foot" }, ok, no);
+  const warn = h("p", { class: "cb-warn" }, `The ${who} has no live helper yet, so there's nowhere to send this. It stays in your inbox.`);
+  warn.hidden = it.deliverable !== false;
+  const el = card("relay-card", head("share", `Send to the ${who}?`),
+    h("p", { class: "cb-muted" }, `From ${it.from || "the crew"}${it.agentName ? " via " + it.agentName : ""}${it.original ? `: “${it.original}”` : ""}`),
+    h("label", { class: "cb-label" }, "Message they'll get", ta),
+    h("p", { class: "cb-muted" }, "Nothing reaches them until you approve."), warn, foot);
+  el.dataset.inbox = it.id;
+  const finish = (msg, sent) => {
+    ta.readOnly = true; el.classList.add("done");
+    foot.replaceChildren(h("div", { class: sent ? "published" : "cb-muted" }, sent ? icon("check") : null, msg));
+    onDone && onDone();
+  };
+  if (it.status && it.status !== "open") { finish(it.status === "answered" ? `Sent to the ${who}` : "Not sent", it.status === "answered"); return el; }
+  if (it.deliverable === false) ok.disabled = true;
+  ok.onclick = async () => {
+    const text = ta.value.trim(); if (!text) { ta.focus(); return; }
+    ok.disabled = no.disabled = true; ok.textContent = "Sending…";
+    const r = await api(`api/inbox/${encodeURIComponent(it.id)}/answer`, { text });
+    if (!r.ok) {
+      ok.textContent = "Approve and send"; no.disabled = false; ok.disabled = r.status === 409;
+      if (r.status === 409) { warn.textContent = r.data.reply || warn.textContent; warn.hidden = false; }
+      else toast(r.data.reply || r.data.error || "Couldn't send. Try again.", "err");
+      return;
+    }
+    const names = r.data.delivered?.members?.map((n) => String(n).split(" ")[0]).join(" and ");
+    toast(names ? `Sent to ${names}` : `Sent to the ${who}`);
+    finish(names ? `Sent to ${names}` : `Sent to the ${who}`, true);
+  };
+  no.onclick = async () => {
+    ok.disabled = no.disabled = true;
+    const r = await api(`api/inbox/${encodeURIComponent(it.id)}/dismiss`, {});
+    if (!r.ok) { ok.disabled = it.deliverable === false; no.disabled = false; toast(r.data.error || "Couldn't do that. Try again.", "err"); return; }
+    finish(`Not sent. Nothing reached the ${who}.`, false);
+  };
+  return el;
+}
+
 export function renderCard(c) {
   if (!c || typeof c !== "object") return;
+  if (c.type === "relays") return (c.items || []).map((it) => add(relayCard(it, { onDone: () => ctx.refreshInbox && ctx.refreshInbox() })));
   if (c.type === "share") return shareCard(c);
   if (c.type === "helpers") return helpersCard(c);
   if (c.type === "confirm") return confirmCard(c);

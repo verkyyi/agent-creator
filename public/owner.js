@@ -1,5 +1,5 @@
 import { api, h, toast, ICON, icon, downscale, lockChip, lockPicker, openSheet, closeSheet, shareSheet, wireVoice, scrollToEnd, typingBubble, originBadge, fmtDate, store } from "./common.js";
-import { install as installCards, renderCard } from "./owner-cards.js";
+import { install as installCards, renderCard, relayCard } from "./owner-cards.js";
 
 const $ = (s) => document.querySelector(s);
 const state = { me: null, helpers: [], brain: [], inbox: [] };
@@ -363,8 +363,8 @@ function helperCard(a) {
 }
 
 /* ---------- Inbox ---------- */
-const KIND_ICON = { question: "question", issue: "issue", walkthrough: "video" };
-const KIND_LABEL = { question: "Question", issue: "Problem reported", walkthrough: "Wants a walkthrough" };
+const KIND_ICON = { question: "question", issue: "issue", walkthrough: "video", relay: "share" };
+const KIND_LABEL = { question: "Question", issue: "Problem reported", walkthrough: "Wants a walkthrough", relay: "Update for the homeowner" };
 async function refreshInbox() {
   const r = await api("api/inbox");
   if (!r.ok) return;
@@ -393,6 +393,11 @@ function renderInbox() {
   refreshInbox();
 }
 function openInbox(it) {
+  if (it.kind === "relay") {
+    const done = async () => { await refreshInbox(); renderInbox(); };
+    openSheet(KIND_LABEL.relay, h("div", { class: "stack" }, relayCard(it, { onDone: done })), { testid: "inbox-sheet" });
+    return;
+  }
   const parts = [
     h("div", { class: "label" }, `${KIND_LABEL[it.kind] || it.kind} · ${it.from} via ${it.agentName}`),
     h("div", { class: "quote" }, it.text),
@@ -515,6 +520,6 @@ function showOnboarding() {
   next.focus();
 }
 
-installCards({ sendCreator, log, state, upsertHelper, openLinks, PILL });
+installCards({ sendCreator, log, state, upsertHelper, openLinks, PILL, refreshInbox });
 
 boot();

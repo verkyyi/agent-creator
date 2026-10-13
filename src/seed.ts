@@ -29,7 +29,7 @@ export function seed(): DB {
       {
         id: "sam", tenantId: "rivera", name: "Sam Rivera", role: "owner", groups: [],
         sourceScope: ["src_product_guide", "src_care_warranty", "src_install_oak", "src_site_brief_oak", "src_safety", "src_price_book", "src_inspector_mail"],
-        toolScope: ["job.status", "crew.schedule", "action.log_issue", "action.request_walkthrough"],
+        toolScope: ["job.status", "crew.schedule", "action.log_issue", "action.request_walkthrough", "action.notify_homeowner"],
       },
       { id: "anita", tenantId: "rivera", name: "Anita Patel", role: "customer", groups: ["grp_patel_household"], sourceScope: [], toolScope: [] },
       { id: "raj", tenantId: "rivera", name: "Raj Patel", role: "customer", groups: ["grp_patel_household"], sourceScope: [], toolScope: [] },
@@ -99,6 +99,7 @@ export function seed(): DB {
       { id: "crew.schedule", tenantId: "rivera", name: "Today's crew schedule", operation: "read", description: "Read today's crew schedule for the job" },
       { id: "action.log_issue", tenantId: "rivera", name: "Log an issue for Sam (with photo)", operation: "write", description: "File a job-site issue to the owner's inbox" },
       { id: "action.request_walkthrough", tenantId: "rivera", name: "Request a walkthrough", operation: "write", description: "Ask the owner to schedule a walkthrough" },
+      { id: "action.notify_homeowner", tenantId: "rivera", name: "Send the homeowner an update (Sam approves)", operation: "write", description: "Draft a short update for the job's household; it reaches them only after the owner approves" },
     ],
     templates: [
       {
@@ -110,7 +111,7 @@ export function seed(): DB {
       {
         id: "crew_briefing", purpose: "Brief a crew on site access, scope and safety for one job.",
         sourceCategories: ["site_brief", "safety", "job_record", "product_guide"], audienceKind: "crew", allowedSharing: ["customer", "crew"],
-        tools: ["crew.schedule", "action.log_issue"],
+        tools: ["crew.schedule", "action.log_issue", "action.notify_homeowner"],
         defaults: { name: "Rex", avatar: "🦺", tone: "direct and practical", expiryHint: "when the job closes" },
       },
     ],

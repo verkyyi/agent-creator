@@ -129,7 +129,7 @@ test("agent: server-built persona, search_brain + approved actions only, greetin
 
   const sent = JSON.parse(calls.at(-1)!.init.body);
   const names = sent.session.tools.map((t: any) => t.name);
-  assert.deepEqual(names, ["search_brain", "log_issue"]); // Rex: crew.schedule + action.log_issue, no walkthrough
+  assert.deepEqual(names, ["search_brain", "log_issue", "notify_homeowner"]); // Rex: crew.schedule + log_issue + notify_homeowner, no walkthrough
   assert.ok(!names.includes("relay"));
   assert.deepEqual(sent.session.audio.input.turn_detection, { type: "semantic_vad", eagerness: "high" });
   assert.equal(sent.session.audio.output.voice, "marin");

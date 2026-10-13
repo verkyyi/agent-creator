@@ -181,10 +181,12 @@ export interface Cite { title: string; section: string; version: number }
 export interface InboxRec {
   id: string;
   tenantId: string;
-  kind: "question" | "issue" | "walkthrough";
+  kind: "question" | "issue" | "walkthrough" | "relay";
   agentId: string;
   fromId: string;
-  text: string;
+  text: string; // relay: the drafted homeowner message the owner approves
+  original?: string; // relay: the crew member's own words
+  targetGroupId?: string; // relay: the household that receives it once the owner approves
   imageDataUrl?: string;
   status: "open" | "answered" | "dismissed";
   answer?: string;

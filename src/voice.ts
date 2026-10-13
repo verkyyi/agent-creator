@@ -61,7 +61,7 @@ export function buildInstructions(persona?: Persona): string {
   return `${BASE_INSTRUCTIONS}\n${parts.join("; ")}.`;
 }
 
-export type HelperPersona = { name: string; tone: string; tenantName: string; ownerName: string; job: string; canLog: boolean; canWalkthrough: boolean };
+export type HelperPersona = { name: string; tone: string; tenantName: string; ownerName: string; job: string; canLog: boolean; canWalkthrough: boolean; canNotify?: boolean };
 
 export function buildAgentInstructions(p: HelperPersona): string {
   const owner = p.ownerName.split(/\s+/)[0];
@@ -78,6 +78,7 @@ export function buildAgentInstructions(p: HelperPersona): string {
     "# Actions",
     p.canLog ? `If the user reports a problem on the job (damage, rot, a leak, something broken or missing), call log_issue with their description, then say it's logged for ${owner}.` : "",
     p.canWalkthrough ? `If the user wants a walkthrough or visit, call request_walkthrough, then say you've asked ${owner} and nothing is booked until ${owner} confirms.` : "",
+    p.canNotify ? `If the user asks you to tell or update the homeowners (an arrival time, a delivery), call notify_homeowner with the message, then say you've sent the update to ${owner} to approve. Never say it was delivered.` : "",
     `You cannot do anything else. For other requests, offer to pass them to ${owner}.`,
     ACK_RULE,
     "",
@@ -201,6 +202,7 @@ voiceRoutes.post("/session", async (c) => {
       instructions: buildAgentInstructions({
         name: ctx.helperName, tone: ctx.info.tone, tenantName: ctx.info.tenantName, ownerName: ctx.info.ownerName, job: ctx.info.job,
         canLog: toolNames.includes("log_issue"), canWalkthrough: toolNames.includes("request_walkthrough"),
+        canNotify: toolNames.includes("notify_homeowner"),
       }),
       tools: ctx.tools,
       turnDetection: AGENT_TURN_DETECTION,

@@ -22,6 +22,7 @@ const STR = {
     source: "Source", loading: "Loading…", sendFail: "That didn't go through. Check your signal and send it again.",
     answered: (o) => `${o} answered:`, savedTo: (c) => `Saved to ${c}'s knowledge`,
     logged: (o) => `Sent to ${o}: `, walk: (o) => `Walkthrough requested from ${o}: `,
+    relayAsk: (o) => `Waiting for ${o} to approve: `, relaySent: "Sent to the homeowners: ", updateFrom: (c) => `Update from ${c}`,
     photoFail: "Couldn't open that photo. Try taking it again.", herePhoto: "Here's a photo.",
     voiceErr: "Voice isn't available right now. Type your message instead.",
     vs: { connecting: "Getting ready…", listening: "Listening…", thinking: "Thinking…", speaking: "Speaking…" },
@@ -44,6 +45,7 @@ const STR = {
     source: "Fuente", loading: "Cargando…", sendFail: "No se pudo enviar. Revisa tu señal e inténtalo otra vez.",
     answered: (o) => `${o} respondió:`, savedTo: (c) => `Guardado en el conocimiento de ${c}`,
     logged: (o) => `Enviado a ${o}: `, walk: (o) => `Visita pedida a ${o}: `,
+    relayAsk: (o) => `Esperando la aprobación de ${o}: `, relaySent: "Enviado a la familia: ", updateFrom: (c) => `Aviso de ${c}`,
     photoFail: "No se pudo abrir la foto. Tómala otra vez.", herePhoto: "Aquí va una foto.",
     voiceErr: "La voz no está disponible ahora. Escribe tu mensaje.",
     vs: { connecting: "Preparando…", listening: "Escuchando…", thinking: "Pensando…", speaking: "Hablando…" },
@@ -143,6 +145,14 @@ function userBubble(text, img) {
   chat.append(el); scrollToEnd(chat); hideStarters(); return el;
 }
 function helperMessage(m) {
+  if (m.action?.kind === "owner_update") {
+    // An owner-approved update from the company: a blue card instead of a plain bubble.
+    chat.append(h("div", { class: "owner-update", "data-kind": "owner_update" },
+      h("div", { class: "ou-head" }, icon("inbox"), t().updateFrom(info?.tenantName || t().company)),
+      h("blockquote", {}, m.action.summary || m.text || "")));
+    scrollToEnd(chat);
+    return;
+  }
   const refused = !!m.refused;
   const el = h("div", { class: "msg in" + (refused ? " denied" : "") },
     refused ? h("div", { class: "who-line" }, icon("lock"), t().notShare) : null,
@@ -158,7 +168,8 @@ function helperMessage(m) {
       h("div", { class: "oa-saved" }, t().savedTo(info?.tenantName || t().company))));
   } else if (m.action) {
     const owner = info?.ownerName || "the owner";
-    const label = m.action.kind === "walkthrough_requested" ? t().walk(owner) : t().logged(owner);
+    const k = m.action.kind;
+    const label = k === "walkthrough_requested" ? t().walk(owner) : k === "relay_requested" ? t().relayAsk(firstName(owner) || owner) : k === "relay_sent" ? t().relaySent : t().logged(owner);
     chat.append(h("div", { class: "action-chip", "data-kind": m.action.kind }, icon("check"), h("span", {}, label + (m.action.summary || ""))));
   }
   scrollToEnd(chat);
