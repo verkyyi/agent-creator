@@ -1,6 +1,6 @@
 import { db, now, record, id, hashConfig, save } from "./store.ts";
 import { aclFor, hydraIngest, hydraSetAcl, localSearch, principalsFor, search } from "./retrieval.ts";
-import { claude } from "./llm.ts";
+import { claude, llmStatus } from "./llm.ts";
 import { remember, recall, forgetAgent } from "./memory.ts";
 import { ask as askBrain } from "./brain.ts";
 import { DEMO_TOKENS } from "./seed.ts";
@@ -394,7 +394,7 @@ export async function chat(m: Member, agentId: string, text: string, imageDataUr
   remember(m.tenantId, m.id, agentId, text);
   const logArr = (db.chatLog[`${a.id}:${m.id}`] ??= []);
   logArr.push({ role: "user", text: text || "(photo)", at: now().toISOString() });
-  const done = (out: { reply: string; citations?: Cite[]; action?: { kind: string; summary: string }; refused?: boolean }) => {
+  const done = (out: { reply: string; citations?: Cite[]; action?: { kind: string; summary: string }; refused?: boolean; notice?: string }) => {
     // Re-check after retrieval/tools and before releasing output: a revocation or expiry
     // observed now withholds the answer.
     ensureLive(db.agents.find((x) => x.id === a.id)!);
@@ -460,7 +460,9 @@ End with the excerpt numbers you used in the form USED:1,2 on its own last line.
     reply = safe.length ? safe[0].text : toolNote;
     used = safe.slice(0, 1);
   }
-  return done({ reply, citations: used.map((x) => ({ title: x.title, section: x.section, version: x.version })) });
+  // The AI couldn't be reached (no credential, proxy down): say so plainly, never the internal error.
+  const notice = !llm && !llmStatus.ok ? "The AI assistant is unavailable right now, so this answer is quoted straight from the company's notes." : undefined;
+  return done({ reply, citations: used.map((x) => ({ title: x.title, section: x.section, version: x.version })), ...(notice ? { notice } : {}) });
 }
 
 export function history(m: Member, agentId: string) {
