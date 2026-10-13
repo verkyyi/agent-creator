@@ -650,3 +650,24 @@ body.voice-open { overflow: hidden; }
 .vc-note .ico-i svg { width: 14px; height: 14px; }
 .vc-line { margin: 0; font-size: .92rem; line-height: 1.4; }
 .vc-line b { font-weight: 700; opacity: .8; }
+
+/* References: one quiet line under an answer, expands in place to the source chips. */
+.sources { display: grid; gap: .2rem; margin-top: .2rem; white-space: normal; }
+.sources-toggle { position: relative; justify-self: start; display: inline-flex; align-items: center; gap: .3rem; min-height: 28px; padding: 0 .1rem; border: 0; background: transparent; color: var(--screen-muted); font: inherit; font-size: .78rem; cursor: pointer; }
+.sources-toggle::before { content: ""; position: absolute; inset: -8px -10px; } /* 44px hit area, small look */
+.sources-toggle:hover, .sources-toggle:focus-visible { color: var(--phone-fg, #fff); text-decoration: underline; }
+.sources-toggle .caret { display: inline-block; transition: transform .15s ease; }
+.sources-toggle[aria-expanded="true"] .caret { transform: rotate(90deg); }
+[dir="rtl"] .sources-toggle .caret { transform: scaleX(-1); }
+[dir="rtl"] .sources-toggle[aria-expanded="true"] .caret { transform: rotate(90deg); }
+.sources-list[hidden] { display: none; }
+.sources-list { margin-top: .1rem; }
+.answer-sources .sources { width: 100%; }
+.answer-sources .sources-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+@media (prefers-reduced-motion: reduce) { .sources-toggle .caret { transition: none; } }
+/* Language picker: a native select inside the globe pill. */
+.lang-btn select, .lang-switch select, .lang-select { min-height: 40px; max-width: 9.5rem; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.lang-btn select option, .lang-switch select option, .lang-select option { color: #111; }
+.lang-switch { align-items: center; gap: .3rem; padding: 0 .6rem; }
+.lang-switch .ico-i svg { width: 18px; height: 18px; }
+.menu-lang { display: flex; align-items: center; gap: .5rem; min-height: 44px; padding: 0 .8rem; }

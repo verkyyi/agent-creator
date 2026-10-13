@@ -1,4 +1,5 @@
-import { api, h, toast, ICON, icon, avatar, avatarKey, svgIcon, downscale, wireVoice, voiceCard, scrollToEnd, typingBubble, citeChip, store } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, avatarKey, svgIcon, downscale, wireVoice, voiceCard, scrollToEnd, typingBubble, citeChip, sourcesToggle, store } from "./common.js";
+import { EN, fmt, pickedLang, baseLang, loadTable, applyDocLang, langPicker } from "./strings.js";
 
 const $ = (s) => document.querySelector(s);
 const id = new URLSearchParams(location.search).get("id");
@@ -6,68 +7,27 @@ const chat = $("#chat"), input = $("#composer-input"), sendBtn = $("#send-btn");
 let info = null, ended = false, voice = null, attached = null, poll = null, isCrew = false, rendered = 0, sending = 0;
 
 /* ---------- language ---------- */
-const STR = {
-  en: {
-    ask: "Ask anything…", photoPh: "Say what's wrong…", send: "Send", talk: "Tap and talk", stopTalk: "Stop talking",
-    attach: "Add a photo", report: "Report a problem", photoAttached: "Photo attached", removePhoto: "Remove photo",
-    ends: "Works until", canDo: "Can also", endedTitle: "This helper has ended",
-    expired: (e, c) => `This link stopped working${e ? " " + e : ""}. Thanks for working with ${c}.`,
-    revoked: (o, c) => `${o} closed this job, so this link no longer works. Thanks for working with ${c}.`,
-    lostTitle: "Open your personal link again", lost: "You were signed out on this phone. Tap the personal link you were sent to keep going.",
-    notFound: "Helper not found", notFoundText: "Check the link you were sent, or ask the person who sent it.",
-    missing: "This link is missing part of its address. Open the link you were sent.",
-    hi: (n, h, c) => `Hi ${n}, I'm ${h} from ${c}.`, hiAnon: (h, c) => `Hi, I'm ${h} from ${c}.`,
-    helpsWith: (j) => `I can help with ${j}.`, worksUntil: (e) => `I work until ${e}.`,
-    typeInstead: "Type instead", notShare: "Not something I can share",
-    source: "Source", loading: "Loading…", sendFail: "That didn't go through. Check your signal and send it again.",
-    answered: (o) => `${o} answered:`, savedTo: (c) => `Saved to ${c}'s knowledge`,
-    logged: (o) => `Sent to ${o}: `, walk: (o) => `Walkthrough requested from ${o}: `,
-    relayAsk: (o) => `Waiting for ${o} to approve: `, relaySent: "Sent to the homeowners: ", updateFrom: (c) => `Update from ${c}`,
-    photoFail: "Couldn't open that photo. Try taking it again.", herePhoto: "Here's a photo.",
-    voiceErr: "Voice isn't available right now. Type your message instead.",
-    vs: { connecting: "Getting ready…", listening: "Listening…", thinking: "Thinking…", speaking: "Speaking…" },
-    vo: {
-      title: "Voice", end: "End", mute: "Mute", unmute: "Unmute", captions: "Captions", ended: "Voice ended",
-      conversation: "Voice conversation", turns: (n) => `${n} ${n === 1 ? "turn" : "turns"}`, results: "Results",
-      showTranscript: "Show transcript", hideTranscript: "Hide transcript",
-      autoNote: "Automatic transcript; may differ slightly from what was said.", you: "You", needsTap: "Needs your tap", ttfa: "Time to first audio",
-    },
-    crew: ["What's the gate code?", "Where do we park?", "What's today's schedule?"],
-    home: ["Will my fridge stay on in a blackout?", "When is the inspection?", "Can we add a second battery later?"],
-    lang: "Español", company: "your contractor",
-  },
-  es: {
-    ask: "Pregunta lo que quieras…", photoPh: "Di qué está mal…", send: "Enviar", talk: "Toca y habla", stopTalk: "Dejar de hablar",
-    attach: "Añadir foto", report: "Reportar un problema", photoAttached: "Foto añadida", removePhoto: "Quitar foto",
-    ends: "Funciona hasta", canDo: "También puede", endedTitle: "Este asistente terminó",
-    expired: (e, c) => `Este enlace dejó de funcionar${e ? " " + e : ""}. Gracias por trabajar con ${c}.`,
-    revoked: (o, c) => `${o} cerró este trabajo, así que este enlace ya no funciona. Gracias por trabajar con ${c}.`,
-    lostTitle: "Abre tu enlace otra vez", lost: "Se cerró tu sesión en este teléfono. Toca el enlace personal que te enviaron para seguir.",
-    notFound: "No se encontró el asistente", notFoundText: "Revisa el enlace que te enviaron o pregunta a quien te lo mandó.",
-    missing: "A este enlace le falta parte de la dirección. Abre el enlace que te enviaron.",
-    hi: (n, h, c) => `Hola ${n}, soy ${h} de ${c}.`, hiAnon: (h, c) => `Hola, soy ${h} de ${c}.`,
-    helpsWith: (j) => `Te ayudo con ${j}.`, worksUntil: (e) => `Funciono hasta ${e}.`,
-    typeInstead: "Prefiero escribir", notShare: "No puedo compartir eso",
-    source: "Fuente", loading: "Cargando…", sendFail: "No se pudo enviar. Revisa tu señal e inténtalo otra vez.",
-    answered: (o) => `${o} respondió:`, savedTo: (c) => `Guardado en el conocimiento de ${c}`,
-    logged: (o) => `Enviado a ${o}: `, walk: (o) => `Visita pedida a ${o}: `,
-    relayAsk: (o) => `Esperando la aprobación de ${o}: `, relaySent: "Enviado a la familia: ", updateFrom: (c) => `Aviso de ${c}`,
-    photoFail: "No se pudo abrir la foto. Tómala otra vez.", herePhoto: "Aquí va una foto.",
-    voiceErr: "La voz no está disponible ahora. Escribe tu mensaje.",
-    vs: { connecting: "Preparando…", listening: "Escuchando…", thinking: "Pensando…", speaking: "Hablando…" },
-    vo: {
-      title: "Voz", end: "Terminar", mute: "Silenciar", unmute: "Activar micrófono", captions: "Subtítulos", ended: "Llamada de voz terminada",
-      conversation: "Conversación de voz", turns: (n) => `${n} ${n === 1 ? "turno" : "turnos"}`, results: "Resultados",
-      showTranscript: "Ver transcripción", hideTranscript: "Ocultar transcripción",
-      autoNote: "Transcripción automática; puede diferir un poco de lo que se dijo.", you: "Tú", needsTap: "Necesita tu toque", ttfa: "Tiempo hasta el primer audio",
-    },
-    crew: ["¿Cuál es el código del portón?", "¿Dónde nos estacionamos?", "¿Cuál es el horario de hoy?"],
-    home: ["¿Mi refrigerador seguirá funcionando en un apagón?", "¿Cuándo es la inspección?", "¿Podemos añadir otra batería después?"],
-    lang: "English", company: "tu contratista",
-  },
-};
-let lang = store.get("lang") === "es" ? "es" : "en";
-const t = () => STR[lang];
+// "auto" follows the browser; anything else is the visitor's pick, sent with chat and voice.
+let pick = store.get("lang") || "auto";
+let lang = pickedLang(pick);
+let T = build(EN);
+function build(S) {
+  const f = (k, names) => (...a) => fmt(S[k], Object.fromEntries(names.map((n, i) => [n, a[i]])));
+  return {
+    ...S,
+    expired: f("expired", ["e", "c"]), revoked: f("revoked", ["o", "c"]), hi: f("hi", ["n", "h", "c"]), hiAnon: f("hiAnon", ["h", "c"]),
+    helpsWith: f("helpsWith", ["j"]), worksUntil: f("worksUntil", ["e"]), answered: f("answered", ["o"]), savedTo: f("savedTo", ["c"]),
+    logged: f("logged", ["o"]), walk: f("walk", ["o"]), relayAsk: f("relayAsk", ["o"]), updateFrom: f("updateFrom", ["c"]),
+    sources: (n) => (n === 1 ? S.source1 : fmt(S.sourcesN, { n })),
+    vo: { ...S.vo, turns: (n) => (n === 1 ? S.vo.turn1 : fmt(S.vo.turnsN, { n })) },
+  };
+}
+const t = () => T;
+const isEn = () => baseLang(lang) === "en";
+async function setPick(v) {
+  pick = v || "auto"; store.set("lang", pick); lang = pickedLang(pick);
+  await applyLang();
+}
 
 $("#send-btn").innerHTML = ICON.send;
 $("#mic-btn").innerHTML = ICON.mic;
@@ -75,12 +35,18 @@ $("#attach-btn").innerHTML = ICON.cam;
 $("#attach-clear").innerHTML = ICON.x;
 $("#ended-icon").innerHTML = ICON.power;
 
-function applyLang() {
-  document.documentElement.lang = lang;
+const picker = () => langPicker(pick, setPick, { label: t().language, auto: t().auto, other: t().other, otherPrompt: t().otherPrompt });
+async function applyLang() {
+  const want = lang;
+  const table = await loadTable(want);
+  if (want !== lang) return; // a newer pick won
+  T = build(table);
+  applyDocLang(lang);
+  if (pick === "auto") delete document.documentElement.dataset.pick; else document.documentElement.dataset.pick = pick;
   const s = t();
-  $("#lang-btn").innerHTML = ICON.globe;
-  $("#lang-btn").append(h("span", {}, s.lang));
-  $("#lang-btn").setAttribute("aria-label", lang === "es" ? "Change to English" : "Cambiar a español");
+  const slot = $("#lang-btn");
+  slot.innerHTML = ICON.globe;
+  slot.append(picker());
   input.placeholder = attached ? s.photoPh : s.ask;
   input.setAttribute("aria-label", s.ask);
   sendBtn.setAttribute("aria-label", s.send);
@@ -95,9 +61,6 @@ function applyLang() {
   renderStarters();
   const w = document.querySelector(".welcome"); if (w) { w.remove(); showWelcome(); }
 }
-$("#lang-btn").addEventListener("click", () => {
-  lang = lang === "es" ? "en" : "es"; store.set("lang", lang); applyLang();
-});
 
 function showScreen(title, text, { power = true } = {}) {
   ended = true;
@@ -114,13 +77,13 @@ function showScreen(title, text, { power = true } = {}) {
 
 function endHelper(st, reply) {
   if (ended) return;
-  const owner = info?.ownerName || (lang === "es" ? "El dueño" : "The owner");
+  const owner = info?.ownerName || t().theOwner;
   const company = info?.tenantName || t().company;
-  const text = lang === "es" || !reply
+  const text = !isEn() || !reply
     ? (st === "expired" ? t().expired(info?.endsLabel, company) : t().revoked(owner, company))
     : reply;
   showScreen(t().endedTitle, text);
-  if (info) { $("#h-sub").textContent = `${info.tenantName || ""} · ${lang === "es" ? "terminado" : "ended"}`; }
+  if (info) { $("#h-sub").textContent = `${info.tenantName || ""} · ${t().ended}`; }
 }
 
 function authLost() { showScreen(t().lostTitle, t().lost, { power: false }); }
@@ -174,11 +137,12 @@ function helperMessage(m) {
   const el = h("div", { class: "msg in" + (refused ? " denied" : "") },
     refused ? h("div", { class: "who-line" }, icon("lock"), t().notShare) : null,
     m.reply ?? m.text ?? "");
-  if (m.citations?.length) el.append(h("div", { class: "cites" }, m.citations.map((c) => citeChip(c, id, { prefix: t().source, loading: t().loading }))));
-  if (m.notice) el.append(h("div", { class: "notice" }, lang === "es" ? "El asistente de IA no está disponible ahora; esta respuesta viene tal cual de las notas de la empresa." : m.notice));
+  // References fold into one quiet line; refused answers carry none.
+  if (m.citations?.length && !refused) el.append(sourcesToggle(m.citations.map((c) => citeChip(c, id, { prefix: t().source, loading: t().loading })), t().sources(m.citations.length)));
+  if (m.notice) el.append(h("div", { class: "notice" }, isEn() ? m.notice : t().aiDown));
   chat.append(el);
   if (m.action?.kind === "owner_answer") {
-    const owner = firstName(info?.ownerName) || (lang === "es" ? "El dueño" : "The owner");
+    const owner = firstName(info?.ownerName) || t().theOwner;
     chat.append(h("div", { class: "owner-answer", "data-kind": "owner_answer" },
       h("div", { class: "oa-head" }, icon("check"), t().answered(owner)),
       h("blockquote", {}, `“${m.action.summary || ""}”`),
@@ -236,8 +200,7 @@ function showWelcome() {
   const close = () => { store.set(`cb.welcomed.${id}`, "1"); w.remove(); };
   const talkBtn = h("button", { class: "btn yellow big-btn", id: "welcome-talk", type: "button", onclick: () => { close(); voice?.start(); } }, icon("mic"), s.talk);
   const typeBtn = h("button", { class: "btn ghost-dark big-btn", id: "welcome-type", type: "button", onclick: () => { close(); input.focus(); } }, s.typeInstead);
-  const langSw = h("div", { class: "lang-switch", role: "group", "aria-label": "Language / Idioma" },
-    ["en", "es"].map((l) => h("button", { type: "button", "aria-pressed": String(l === lang), onclick: () => { if (l !== lang) { lang = l; store.set("lang", l); applyLang(); } } }, l === "en" ? "English" : "Español")));
+  const langSw = h("label", { class: "lang-switch" }, icon("globe"), picker());
   const w = h("div", { class: "welcome", role: "dialog", "aria-modal": "true", "aria-labelledby": "welcome-hi", "data-testid": "welcome" },
     h("div", { class: "welcome-card" },
       langSw,
@@ -310,11 +273,11 @@ function pendingBubble() {
     h("div", { class: "typing", "aria-label": "Thinking" }, h("i"), h("i"), h("i")), status, found);
   return {
     el,
-    status(s) { status.textContent = lang === "es" ? "Revisando las notas…" : s || ""; scrollToEnd(chat); },
+    status(s) { status.textContent = isEn() ? s || "" : t().checking; scrollToEnd(chat); },
     sources(cites) {
       if (!cites?.length) return;
       found.innerHTML = "";
-      for (const c of cites.slice(0, 3)) found.append(citeChip(c, id, { prefix: lang === "es" ? "Encontrado en" : "Found in", loading: t().loading }));
+      for (const c of cites.slice(0, 3)) found.append(citeChip(c, id, { prefix: t().foundIn, loading: t().loading }));
       found.hidden = false; scrollToEnd(chat);
     },
   };
@@ -371,6 +334,7 @@ async function sendInner(text, img) {
   userBubble(text, img);
   const pending = pendingBubble(); chat.append(pending.el); scrollToEnd(chat);
   const body = { text: text || (img ? t().herePhoto : "") };
+  if (pick !== "auto") body.lang = pick;
   if (img) body.imageDataUrl = img;
   const r = (await streamChat(body, pending)) || (await api(`api/agents/${encodeURIComponent(id)}/chat`, body));
   pending.el.remove();
@@ -406,7 +370,7 @@ $("#attach-input").addEventListener("change", async (e) => {
 });
 
 async function boot() {
-  applyLang();
+  await applyLang();
   if (!id) { showScreen(t().notFound, t().missing, { power: false }); return; }
   const [ok, me] = await Promise.all([loadPublic(true), api("api/me")]);
   if (me.ok && me.data.member?.role !== "owner") meName = firstName(me.data.member?.name);

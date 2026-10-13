@@ -1,5 +1,5 @@
 // Inline chat cards for the owner's chat with Crewbrain, plus the composer's attach menu.
-import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, scrollToEnd } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, scrollToEnd, sourcesToggle } from "./common.js";
 
 let ctx;
 const $ = (s) => document.querySelector(s);
@@ -127,16 +127,21 @@ function answerCard(c) {
   const related = (c.related || []).slice(0, 5);
   const open = c.open || [];
   if (!res.length && !related.length && !open.length) return null;
-  return add(h("div", { class: "answer-sources" },
+  // Sources and graph links fold into one quiet line; open questions stay in view.
+  const n = res.length + related.length;
+  const folded = [
     res.length ? h("span", { class: "cb-src-label" }, "From your brain") : null,
-    res.map((r) => h("button", { class: "src-chip", type: "button", onclick: () => openSheet(r.title || "Source",
+    ...res.map((r) => h("button", { class: "src-chip", type: "button", onclick: () => openSheet(r.title || "Source",
       h("div", { class: "stack" }, h("div", { class: "row-btns" }, lockChip(lockFromLabel(r.lockLabel), r.lockLabel)), r.section ? h("div", { class: "label" }, r.section) : null, h("div", { class: "quote excerpt" }, r.text || "")), { testid: "excerpt-sheet" }) },
       lockChip(lockFromLabel(r.lockLabel), r.lockLabel), h("span", { class: "src-t" }, r.title + (r.section ? " · " + r.section : "")))),
-    open.length ? h("span", { class: "cb-src-label" }, "Waiting on you") : null,
-    open.map((i) => h("button", { class: "src-chip", type: "button", "data-testid": "open-item", onclick: () => ctx.sendCreator("What's new?") }, h("span", { class: "src-t" }, `${i.from || "Someone"}: ${i.text}`))),
     related.length ? h("span", { class: "cb-src-label" }, "Related (from the knowledge graph)") : null,
-    related.map((r) => h("span", { class: "src-chip related-chip", "data-testid": "related-chip", title: r.relation || "" },
-      h("span", { class: "src-t" }, `Related: ${r.title}${r.relation ? ` (${r.relation})` : ""}`)))));
+    ...related.map((r) => h("span", { class: "src-chip related-chip", "data-testid": "related-chip", title: r.relation || "" },
+      h("span", { class: "src-t" }, `Related: ${r.title}${r.relation ? ` (${r.relation})` : ""}`))),
+  ];
+  return add(h("div", { class: "answer-sources" },
+    n ? sourcesToggle(folded, n === 1 ? "1 source" : `${n} sources`) : null,
+    open.length ? h("span", { class: "cb-src-label" }, "Waiting on you") : null,
+    open.map((i) => h("button", { class: "src-chip", type: "button", "data-testid": "open-item", onclick: () => ctx.sendCreator("What's new?") }, h("span", { class: "src-t" }, `${i.from || "Someone"}: ${i.text}`)))));
 }
 
 /** Approval card for a crew → household update (inbox item kind "relay"). Returns the element; caller places it. */

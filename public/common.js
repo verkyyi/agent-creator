@@ -537,6 +537,20 @@ export function citeChip(c, agentId, { prefix = "Source", loading = "Loading…"
   const label = `${prefix}: ${c.title}${c.section ? " · " + c.section : ""}`;
   return h("button", { class: "cite", type: "button", onclick: () => openExcerpt(c, agentId, loading) }, icon("source"), h("span", {}, label));
 }
+/** References folded into one quiet line ("▸ 2 sources"); tap expands the chips in place, tap again folds them. */
+let srcSeq = 0;
+export function sourcesToggle(chips, label) {
+  const listId = `src-list-${++srcSeq}`;
+  const list = h("div", { class: "sources-list cites", id: listId, hidden: true }, chips);
+  const btn = h("button", { class: "sources-toggle", type: "button", "aria-expanded": "false", "aria-controls": listId, "data-testid": "sources-toggle" },
+    h("span", { class: "caret", "aria-hidden": "true" }, "▸"), h("span", {}, label));
+  btn.addEventListener("click", () => {
+    const open = btn.getAttribute("aria-expanded") !== "true";
+    btn.setAttribute("aria-expanded", String(open));
+    list.hidden = !open;
+  });
+  return h("div", { class: "sources" }, btn, list);
+}
 async function openExcerpt(c, agentId, loading) {
   const body = h("div", { class: "stack" }, h("div", { class: "reading" }, h("div", { class: "spinner" }), loading));
   openSheet(c.title || "Source", body, { testid: "excerpt-sheet", className: "excerpt-sheet" });

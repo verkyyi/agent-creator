@@ -139,7 +139,7 @@ test("agent: server-built persona, search_brain + approved actions only, greetin
   assert.match(ins, /ALWAYS call search_brain/);
   assert.match(ins, /passed the question to Sam/);
   assert.match(ins, /four four one seven/);
-  assert.match(ins, /Spanish/);
+  assert.match(ins, /language the user speaks, whatever language it is/);
   assert.doesNotMatch(ins, /request_walkthrough/);
 
   // Not in the audience → 403 without minting.

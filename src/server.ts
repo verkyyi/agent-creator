@@ -13,6 +13,7 @@ import { brainRoutes } from "./brain.ts";
 import type { Member } from "./types.ts";
 import { accessLog } from "./access.ts";
 import { llmConfigured } from "./llm.ts";
+import { localize, uiTable } from "./i18n.ts";
 
 type Env = { Variables: { member: Member } };
 
@@ -47,11 +48,19 @@ function sandboxOf(c: Context): Sandbox | undefined {
   return own ?? getSandbox(getCookie(c, "cb_sandbox"));
 }
 
-const wrap = (fn: (c: Context<Env>) => unknown) => async (c: Context<Env>) => {
+const langOf = (v: unknown) => (typeof v === "string" && v.length <= 35 ? v : undefined);
+/** An HttpError body whose `reply` is said in the user's language. */
+async function localBody(body: any, userText?: string, lang?: string) {
+  return body && typeof body.reply === "string" ? { ...body, reply: await localize(body.reply, { userText, lang }) } : body;
+}
+const wrap = (fn: (c: Context<Env>) => unknown, i18n?: (c: Context<Env>) => Promise<{ text?: string; lang?: string }>) => async (c: Context<Env>) => {
   try {
     return c.json((await fn(c)) as object);
   } catch (e) {
-    if (e instanceof core.HttpError) return c.json(e.body, e.status as any);
+    if (e instanceof core.HttpError) {
+      const ctx = i18n ? await i18n(c).catch(() => ({} as { text?: string; lang?: string })) : {};
+      return c.json(i18n ? await localBody(e.body, ctx.text, ctx.lang) : e.body, e.status as any);
+    }
     console.error(e);
     return c.json({ error: "server_error", reply: "Something went wrong. Try again." }, 500);
   }
@@ -103,7 +112,15 @@ export function buildApp() {
     return { member: { id: m.id, name: m.name, role: m.role, tenantId: m.tenantId, tenantName: core.tenantOf(m.tenantId).name }, helpers: core.helpersFor(m) };
   }));
 
-  app.post("/api/creator/message", wrap(async (c) => core.creatorMessage(c.get("member"), String((await c.req.json()).text ?? ""), base(c))));
+  app.post("/api/creator/message", wrap(async (c) => {
+    const b = await c.req.json();
+    const text = String(b.text ?? "");
+    const out = await core.creatorMessage(c.get("member"), text, base(c));
+    // The creator talks back in the owner's language: fixed replies are English templates.
+    return out && typeof out.reply === "string" ? { ...out, reply: await localize(out.reply, { userText: text, lang: langOf(b.lang) }) } : out;
+  }));
+  // The UI string table in any language (EN/ES static; others translated once, cached on disk).
+  app.get("/api/i18n/:lang", async (c) => c.json(await uiTable(c.req.param("lang"))));
   app.get("/api/creator/log", wrap((c) => ({ messages: db.creatorLog[c.get("member").id] ?? [] })));
   app.post("/api/agents/:id/approve", wrap(async (c) => core.approve(c.get("member"), c.req.param("id")!, Number((await c.req.json()).rev), base(c))));
   app.post("/api/agents/:id/close", wrap((c) => core.closeAgent(c.get("member"), c.req.param("id")!)));
@@ -118,6 +135,7 @@ export function buildApp() {
     const b = await c.req.json().catch(() => ({} as Record<string, unknown>));
     const m = c.get("member"), agentId = c.req.param("id")!;
     const text = String(b.text ?? "").slice(0, 2000), img = typeof b.imageDataUrl === "string" ? b.imageDataUrl : undefined;
+    const lang = langOf(b.lang);
     return streamSSE(c, async (stream) => {
       const t0 = performance.now();
       let firstSources: number | undefined;
@@ -127,22 +145,22 @@ export function buildApp() {
         const out = await core.chat(m, agentId, text, img, (name, data) => {
           if (name === "sources" && firstSources === undefined) firstSources = Math.round(performance.now() - t0);
           send(name, data);
-        });
+        }, lang);
         const ms = Math.round(performance.now() - t0);
         console.log(`[chat] first-sources=${firstSources ?? "-"}ms reply=${ms}ms`);
         send("reply", { ...out, ms });
         send("done", {});
       } catch (e) {
-        if (e instanceof core.HttpError) send("error", e.body);
-        else { console.error(e); send("error", { error: "server_error", reply: "Something went wrong. Try again." }); }
+        if (e instanceof core.HttpError) send("error", await localBody(e.body, text, lang));
+        else { console.error(e); send("error", { error: "server_error", reply: await localize("Something went wrong. Try again.", { userText: text, lang }) }); }
       }
       await q;
     });
   });
   app.post("/api/agents/:id/chat", wrap(async (c) => {
     const b = await c.req.json();
-    return core.chat(c.get("member"), c.req.param("id")!, String(b.text ?? "").slice(0, 2000), typeof b.imageDataUrl === "string" ? b.imageDataUrl : undefined);
-  }));
+    return core.chat(c.get("member"), c.req.param("id")!, String(b.text ?? "").slice(0, 2000), typeof b.imageDataUrl === "string" ? b.imageDataUrl : undefined, undefined, langOf(b.lang));
+  }, async (c) => { const b = await c.req.json().catch(() => ({})); return { text: String(b.text ?? ""), lang: langOf(b.lang) }; }));
 
   app.get("/api/brain", wrap((c) => core.brain(c.get("member"))));
   app.post("/api/brain/capture", wrap(async (c) => { const b = await c.req.json(); return core.capture(c.get("member"), b.imageDataUrl, b.hint); }));

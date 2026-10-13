@@ -211,7 +211,7 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode, agentId, persona }),
+      body: JSON.stringify({ mode, agentId, persona, lang: document.documentElement.dataset.pick || undefined }),
     });
     try { sess = await r.json(); } catch (_) { sess = {}; }
     if (r.status === 503) throw codedError("voice_unavailable");

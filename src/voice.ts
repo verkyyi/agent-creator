@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HttpError } from "./core.ts";
 import { agentVoiceContext, appendTranscript, endVoiceSession, runVoiceTool } from "./voicetools.ts";
 import type { Member } from "./types.ts";
+import { localize } from "./i18n.ts";
 
 // OpenAI Realtime (GA) — speech-to-speech over WebRTC from the browser.
 // The server only mints an ephemeral client secret; OPENAI_API_KEY never leaves this process.
@@ -46,22 +47,30 @@ const BASE_INSTRUCTIONS = [
   "You are only a voice interface. You never answer on your own.",
   "For EVERY user utterance, call the `relay` tool with the user's exact words: a faithful transcription in the same language they spoke. Never paraphrase, summarize, translate, or answer it yourself.",
   ACK_RULE,
-  "When the tool returns, speak its `reply` naturally and nearly verbatim, in the user's language (if the user spoke Spanish, speak Spanish and translate the reply faithfully). If the reply is long, say its first two sentences and stop.",
+  "When the tool returns, speak its `reply` naturally and nearly verbatim, in the language the user spoke, whatever language it is (translate the reply faithfully if it is in another language). If the reply is long, say its first two sentences and stop.",
   "Never add facts. Never claim an action happened unless the reply says so. If the reply refuses or says the helper has ended, say so plainly.",
   SPOKEN_STYLE,
 ].join("\n");
 
-export function buildInstructions(persona?: Persona): string {
+/** The visitor's picked language (BCP-47), told to the realtime model so it speaks it from the first word. */
+export function langLine(lang?: string): string {
+  return lang && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(lang)
+    ? `The user picked the language with BCP-47 code "${lang}": greet and speak in it by default, but if they speak another language, switch to theirs.`
+    : "";
+}
+
+export function buildInstructions(persona?: Persona, lang?: string): string {
   const name = persona?.name?.trim();
   const tone = persona?.tone?.trim();
-  if (!name && !tone) return BASE_INSTRUCTIONS;
+  const ll = langLine(lang);
+  if (!name && !tone) return ll ? `${BASE_INSTRUCTIONS}\n${ll}` : BASE_INSTRUCTIONS;
   const parts: string[] = [];
   if (name) parts.push(`You speak as ${name}`);
   if (tone) parts.push(`tone: ${tone}`);
-  return `${BASE_INSTRUCTIONS}\n${parts.join("; ")}.`;
+  return `${BASE_INSTRUCTIONS}\n${parts.join("; ")}.${ll ? `\n${ll}` : ""}`;
 }
 
-export type HelperPersona = { name: string; tone: string; tenantName: string; ownerName: string; job: string; canLog: boolean; canWalkthrough: boolean; canNotify?: boolean };
+export type HelperPersona = { name: string; tone: string; tenantName: string; ownerName: string; job: string; canLog: boolean; canWalkthrough: boolean; canNotify?: boolean; lang?: string };
 
 export function buildAgentInstructions(p: HelperPersona): string {
   const owner = p.ownerName.split(/\s+/)[0];
@@ -83,7 +92,8 @@ export function buildAgentInstructions(p: HelperPersona): string {
     ACK_RULE,
     "",
     "# Language",
-    "Reply in the language the user speaks (Spanish if they speak Spanish), even though the excerpts are in English. Translate faithfully, keep codes and numbers exact.",
+    "Reply in the language the user speaks, whatever language it is, even though the excerpts are in English. Translate faithfully, keep names, codes and numbers exact.",
+    langLine(p.lang),
     "",
     "# Style",
     SPOKEN_STYLE,
@@ -189,6 +199,7 @@ voiceRoutes.post("/session", async (c) => {
   const mode: VoiceMode = b?.mode === "agent" ? "agent" : b?.mode === "creator" ? "creator" : (null as any);
   if (!mode) return c.json({ error: "bad_request", detail: "mode must be creator or agent" }, 400);
   const agentId = typeof b?.agentId === "string" ? b.agentId : undefined;
+  const lang = typeof b?.lang === "string" && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(b.lang) ? b.lang : undefined;
   if (mode === "agent" && !agentId) return c.json({ error: "bad_request", detail: "agentId required" }, 400);
 
   if (mode === "agent") {
@@ -196,13 +207,13 @@ voiceRoutes.post("/session", async (c) => {
     if (!m) return c.json({ error: "unauthenticated", reply: "Open your personal link again." }, 401);
     let ctx;
     try { ctx = agentVoiceContext(m, agentId!); } catch (e) { return fail(c, e); }
-    if (!ctx.live) return c.json({ error: "ended", state: ctx.info.state === "revoked" ? "revoked" : "expired", reply: "This helper has ended." }, 410);
+    if (!ctx.live) return c.json({ error: "ended", state: ctx.info.state === "revoked" ? "revoked" : "expired", reply: await localize("This helper has ended.", { lang }) }, 410);
     const toolNames = ctx.tools.map((t: any) => t.name as string);
     const config = buildSessionConfig({
       instructions: buildAgentInstructions({
         name: ctx.helperName, tone: ctx.info.tone, tenantName: ctx.info.tenantName, ownerName: ctx.info.ownerName, job: ctx.info.job,
         canLog: toolNames.includes("log_issue"), canWalkthrough: toolNames.includes("request_walkthrough"),
-        canNotify: toolNames.includes("notify_homeowner"),
+        canNotify: toolNames.includes("notify_homeowner"), lang,
       }),
       tools: ctx.tools,
       turnDetection: AGENT_TURN_DETECTION,
@@ -223,7 +234,7 @@ voiceRoutes.post("/session", async (c) => {
           tone: typeof b.persona.tone === "string" ? b.persona.tone.slice(0, 200) : undefined,
         }
       : undefined;
-  const r = await mintClientSecret(apiKey, buildSessionConfig(persona));
+  const r = await mintClientSecret(apiKey, buildSessionConfig(lang ? { instructions: buildInstructions(persona, lang), tools: [RELAY_TOOL], turnDetection: CREATOR_TURN_DETECTION } : persona));
   if (!r.ok) return c.json({ error: "voice_upstream", detail: r.detail }, 502);
   return c.json({ clientSecret: r.clientSecret, expiresAt: r.expiresAt, model: r.model, mode, relayPath: relayPathFor(mode, agentId) });
 });

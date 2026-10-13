@@ -1,8 +1,23 @@
 import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, openSheet, closeSheet, shareSheet, wireVoice, scrollToEnd, typingBubble, originBadge, fmtDate, store } from "./common.js";
 import { install as installCards, renderCard, renderCardInto, relayCard } from "./owner-cards.js";
+import { pickedLang, applyDocLang, langPicker } from "./strings.js";
 
 const $ = (s) => document.querySelector(s);
 const state = { me: null, helpers: [], brain: [], inbox: [] };
+
+/* ---------- language: Auto follows the browser; a pick is sent with creator messages and voice ---------- */
+let langPick = store.get("lang") || "auto";
+function applyOwnerLang() {
+  applyDocLang(pickedLang(langPick));
+  if (langPick === "auto") delete document.documentElement.dataset.pick; else document.documentElement.dataset.pick = langPick;
+}
+applyOwnerLang();
+{
+  const row = document.createElement("label");
+  row.className = "menu-lang"; row.innerHTML = ICON.globe;
+  row.append(langPicker(langPick, (v) => { langPick = v || "auto"; store.set("lang", langPick); applyOwnerLang(); }));
+  document.querySelector("#menu-pop .menu-sep")?.after(row);
+}
 
 /* ---------- boot ---------- */
 document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el.dataset.icon]));
@@ -112,7 +127,7 @@ function handleCreatorReply(data) {
 async function sendCreator(text) {
   bubble("owner", text);
   const typing = typingBubble(); log.append(typing); scrollToEnd(log);
-  const r = await api("api/creator/message", { text });
+  const r = await api("api/creator/message", langPick !== "auto" ? { text, lang: langPick } : { text });
   typing.remove();
   if (!r.ok) { bubble("creator", r.data.reply || r.data.error || "That didn't go through. Check your signal and send it again."); return; }
   handleCreatorReply(r.data);
