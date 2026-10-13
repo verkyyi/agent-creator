@@ -1,71 +1,68 @@
 # Crewbrain
 
-**Your company's know-how, on every job.** Talk to Crewbrain and it makes helpers for your homeowners and crews. They see only what you allow, take real actions, and stop when the job ends.
+**Voice AI helpers for contractors' crews and homeowners.** Tell Crewbrain who needs help and it makes a helper for them. Each helper only sees what you allow, answers in their language, gets real work done, and switches off when the job ends.
 
 | | |
 |---|---|
-| **Live demo** | https://macmini.tail435588.ts.net:10000/crewbrain/demo.html (pick a person, no sign-up) |
+| **Live demo** | https://macmini.tail435588.ts.net:10000/crewbrain/demo.html (pick a person, no sign-up; every visitor gets a private copy) |
 | **Landing page** | https://verkyyi.github.io/agent-creator/ |
-| **Demo video** | [Watch on the landing page](https://verkyyi.github.io/agent-creator/#video) · [Download 1080p](https://github.com/verkyyi/agent-creator/releases/tag/v1.0-hackathon) |
+| **Demo video (3:10)** | [Watch on the landing page](https://verkyyi.github.io/agent-creator/#video) · [Download 1080p](https://github.com/verkyyi/agent-creator/releases/download/v1.0-hackathon/crewbrain-demo-v3.mp4) |
+| **Devpost** | https://devpost.com/software/crewbrain |
 | **Built for** | Company Brain Hackathon, Menlo Park, Oct 12 2026 |
 
-[![Watch the 4-minute demo](docs/media/poster.png)](https://verkyyi.github.io/agent-creator/#video)
+[![Watch the demo](docs/media/poster-v3.jpg)](https://verkyyi.github.io/agent-creator/#video)
 
-![Approve a helper, the crew asks in Spanish, the job closes](docs/screenshots/00-hero-strip.png)
+![Approve one card · the crew asks in Spanish · the homeowner is refused the gate code · the job closes](docs/screenshots/v2-00-hero-strip.png)
 
-## What it does
+## Three ideas
 
-A small contractor (Sam, Rivera Solar & Electric) keeps everything the company knows in one **company brain**, and every item has a lock: **Office only**, **Crew** for a job, or **Homeowners**.
+1. **Say it, get a helper.** Sam, the owner, says one sentence in any language, by voice or text: "Brief Bay Roofing's crew for the Oak St job until it closes Friday." The assistant asks only what's missing and shows one compact card: who can use it, what it knows, what it can do, what it can't see, when it ends. Nothing goes live until Sam taps **Approve**. Links go out by text, email or QR.
+2. **Only what they should see.** Every piece of company knowledge has a lock: **Office only**, **Crew** for a job, or **Homeowners**. Helpers search *as their audience*, so a locked note never comes back from the search. Rex gives the crew the gate code in Spanish; Juno tells the homeowner "that's not something I can see" in Chinese.
+3. **Access ends with the job.** "Close Rex" → a confirm card → tap. Open chats stop on the spot and the site brief locks back to Office only.
 
-1. **Say who needs help.** "Brief Bay Roofing's crew for the Oak St job until the job closes Friday." The assistant asks only what's missing and shows an approval card: who can use it, what it knows, what it can't see, what it can do, when it ends.
-2. **Approve and send.** Nothing goes live until Sam taps. Each person gets a personal link by text, email or QR code.
-3. **They ask, by voice, in any language.** Juno answers the Patel household with sources. Rex gives the crew the gate code in Spanish, and logs a damage photo straight to Sam.
-4. **Sam stays in the loop.** "What's new?" gets a spoken summary. "Tell Anita yes, after inspection" sends the answer back to her chat and saves it as company knowledge, only after Sam approves.
-5. **The job closes, access ends.** "Close Rex" → open chats stop, and the site brief with the gate code locks back to Office only.
+Along the way the helpers get work done: Rex files a damage photo to Sam's inbox and drafts an update for the homeowner that Sam approves; questions a helper can't answer go to Sam, and his answer becomes company knowledge (and feedback to HydraDB).
 
-Everything happens in **one conversation, by voice or text**. The Brain, Helpers and Inbox screens are optional.
+| Approve one card | Send the links | Talk, full screen | Crew, in Spanish | Homeowner, in Chinese | Job closed | Company brain |
+|---|---|---|---|---|---|---|
+| ![](docs/screenshots/v2-01-approval.png) | ![](docs/screenshots/v2-02-share.png) | ![](docs/screenshots/v2-03-voice.png) | ![](docs/screenshots/v2-04-rex-es.png) | ![](docs/screenshots/v2-05-juno-zh.png) | ![](docs/screenshots/v2-06-ended.png) | ![](docs/screenshots/v2-07-brain.png) |
 
-| Approve | Share | Crew helper | Ended | Company brain |
-|---|---|---|---|---|
-| ![](docs/screenshots/02-approval.png) | ![](docs/screenshots/03-share.png) | ![](docs/screenshots/04-helper-welcome.png) | ![](docs/screenshots/07-ended.png) | ![](docs/screenshots/08-brain.png) |
+## What's in the MVP
+
+- **One conversation for the owner.** A tool-using agent (Claude) does the orchestration: create, edit, share, close, "what's new?", reply, remember a note, change a lock, ask the brain, job status. The server only provides tools and keeps the guarantees: knowledge scope is computed server-side, end times are validated, and publishing, closing, relocking and sending always need the owner's tap.
+- **Voice like a phone call.** Full-screen voice mode on OpenAI gpt-realtime with barge-in and about 1.5 s to first audio; answers come from server-gated tools, so voice can't bypass access control. One result card per call instead of transcript noise.
+- **Any language.** Answers follow the language people write or speak; the interface follows the phone (17 languages pre-translated, any other on demand).
+- **Fast, grounded answers.** Sources appear in about 0.4 s, answers stream in about 2–3 s, and citations stay one tap away (collapsed by default).
+- **Phone first.** Installable PWA for iPhone and Android, works offline for reading, queues messages until the signal is back.
+- **Safe to demo publicly.** Every visitor gets their own sandbox; nothing one visitor does reaches another.
 
 ## How it's built
 
-- **HydraDB** is the brain. One database per company. Every source carries an `acl` derived from its lock, and **every helper searches as its audience** (`group:crewbrain:crew:<job>`, `group:crewbrain:household:<job>`), so a locked document never comes back from the search. Relocking is one `PATCH /context/{id}/metadata` that applies on the next query. The app then intersects results with the helper's approved sources and current lock.
-- **Claude** (Agent SDK) writes grounded answers from retrieved excerpts with citations, refuses when they don't cover the question, treats document text as data, and reads photos of documents into knowledge drafts.
-- **OpenAI gpt-realtime** is the voice: speech-to-speech over WebRTC with an ephemeral key. It answers through server-gated tools (`search_brain`, `log_issue`, `request_walkthrough`), so voice can't bypass access control. Barge-in, semantic turn detection, time-to-first-audio is measured.
-- **App:** Node 22 + TypeScript (Hono), mobile-first installable PWA with offline shell and outbox, served from a Mac mini behind Tailscale Funnel.
+```
+phone (PWA, voice) ─▶ server: identity → audience → lifecycle → tool gate ─▶ HydraDB (search as the audience)
+        │                         │                                         └▶ Claude (owner agent, grounded answers)
+        └─ gpt-realtime voice ────┘  same gated tools                          OpenAI fast model as a backup
+```
 
-```
-phone (PWA, voice) ─> server: identity → audience → lifecycle → tool gate ─> HydraDB (search as audience)
-                                   │                                         └> Claude (answer + cite)
-                                   └> gpt-realtime (voice, via the same gated tools)
-```
+- **HydraDB** is the brain: one database per company, an `acl` on every source derived from its lock, every helper queries as its audience (`group:crewbrain:crew:<job>`, `group:crewbrain:household:<job>`); owner answers are sent back as `/feedback` with ground truth; the owner's "what's going on at 42 Oak St?" uses graph context.
+- **Claude** (Agent SDK, Sonnet and Haiku) runs the owner's agent with in-process tools and writes grounded, cited answers; document text is treated as data, never instructions.
+- **OpenAI** gpt-realtime for speech-to-speech; a small fast model for UI translation and as a latency backup.
+- Node 22 + TypeScript (Hono), plain ES-module PWA, deployed on a Mac mini behind Tailscale Funnel.
 
 ## Access tests
 
-`NODE_ENV=test npx tsx --test test/*.test.ts`: create & publish, two distinct helpers, unauthorized document, tenant isolation, audience restriction, close/revocation, real expiry (test clock), edits need approval, approval integrity, learning & escalation, prompt injection, gated write actions, answers return to the asker, voice tool gating, brain ingestion.
+`NODE_ENV=test npx tsx --test test/*.test.ts` (69 tests): create and publish, two distinct helpers, unauthorized document, tenant isolation, audience restriction, close and revocation, real expiry with a test clock, edits need approval, approval integrity, learning and escalation, prompt injection, gated write actions, answers return to the asker, crew-to-homeowner updates, voice tool gating, sandbox isolation, streaming, HydraDB feedback, the agent's tools can't publish, any-language flows.
 
 ## Run it
 
 ```sh
-npm ci --include=optional   # the Agent SDK's native Claude binary is an optional per-platform package; postinstall fails without it
+npm ci
 security add-generic-password -a crewbrain -s HYDRA_DB_API_KEY -w <key>   # also OPENAI_API_KEY, CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
 ./scripts/start.sh          # http://127.0.0.1:8787/demo.html
 ./scripts/deploy.sh         # test-gated deploy to the mini
-scripts/visits.sh [days]    # daily requests, unique IPs, visitors, page views, members, referers
 ```
-
-**Claude.** Auth is `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), read from the Keychain by `scripts/start.sh`; it never reaches a log or a response. Models are limited to Sonnet 5.5 (default) and Haiku 5.5. An SDK error (e.g. "Not logged in") is never shown as a reply: helpers answer from the notes and say in plain words that the AI is unavailable.
-
-**Sandboxes.** Each demo visitor gets their own sandbox on first visit to the demo page: a fresh copy of both companies and all seven identities, with random invite tokens, stored in `data/sandboxes/<id>.json` (`SANDBOX_DIR`). Every read and write (chats, creator, drafts, inbox, photos, knowledge, approvals, events, memories, clock) stays in it. A sandbox unseen for 7 days is deleted (`SANDBOX_TTL_DAYS`); at most 500 are kept, oldest dropped first (`SANDBOX_MAX`). `/api/reset` and `/api/clock` (owner, `TEST_CLOCK=1`) act on the caller's sandbox only. The fixed tokens in `src/seed.ts` work only in tests or with `DEMO_LEGACY_TOKENS=1` (local dev, video recording). On first start the old `data/db.json` is renamed to `data/db.json.archived-<date>`, never deleted.
-
-**Access log.** `logs/access.log` (override with `ACCESS_LOG_DIR`), one JSON line per request: time, method, path, status, ms, client IP (`X-Forwarded-For` from Funnel), User-Agent, Referer, sandbox (one per visitor), tenant/member. Never cookies, tokens, query strings or bodies; invite tokens in paths are masked. Rolled daily and at 10 MB, kept 30 days.
-
-**Deploy on the mini by hand** (as the service's user): `git pull && npm ci --include=optional && launchctl kickstart -k gui/$(id -u)/com.verkyyi.crewbrain`.
 
 Without keys it runs in offline mode (local search, extractive answers, no voice).
 
 ## Team
 
-Lianghui Yi · Charlotte He. Story and video script: [`Storytelling`](Storytelling), [`Video Script`](Video%20Script). API: [`docs/API.md`](docs/API.md).
+Lianghui Yi · Charlotte He · chengjiafeng857 Feng. Story and video script: [`Storytelling`](Storytelling), [`Video Script`](Video%20Script). API: [`docs/API.md`](docs/API.md).
