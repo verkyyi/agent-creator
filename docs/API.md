@@ -44,6 +44,11 @@ When a chat is refused, `reply` holds the sentence to show/speak.
 - `POST api/agents/:id/chat` `{ text, imageDataUrl?: string }` →
   `{ reply, citations: { title, section, version }[], action?: { kind: "issue_logged"|"walkthrough_requested", summary }, refused?: true }`
   410 `{ error: "ended", state: "expired"|"revoked", reply }` once the helper ended.
+- `POST api/agents/:id/chat?stream=1` (same body) → `text/event-stream`, events in order:
+  `status` `{ text }` at once · `sources` `{ citations }` right after retrieval (before Claude) ·
+  `action` `{ kind, summary }` when a write action happens · `reply` (the non-stream body plus `ms`, server time) · `done` `{}`.
+  A 403/404/410 is a single `error` event whose data is the non-stream JSON body. A 401 (no session) stays a plain JSON 401.
+  Helper answers use `claude-haiku-5-5` when the retrieved excerpts total < 1500 chars, else `claude-sonnet-5-5`.
 - `GET api/agents/:id/history` → `{ messages: { role: "user"|"helper", text, at, citations?, action? }[] }`
 - `POST api/voice/session` `{ mode: "creator"|"agent", agentId? }` → `{ clientSecret, expiresAt, model, relayPath }` (503 when voice is unavailable)
 

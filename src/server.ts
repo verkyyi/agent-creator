@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { getCookie, setCookie } from "hono/cookie";
+import { streamSSE } from "hono/streaming";
 import { randomBytes } from "node:crypto";
 import { db, now, record, reset, save, createSandbox, getSandbox, inSandbox, inviteToken, isDefaultSandbox, resolveInvite, sandboxId, gc, archiveLegacyFile, type Sandbox } from "./store.ts";
 import { hydraBoot, hydraIngest, hydraState, sharingFromLabel } from "./retrieval.ts";
@@ -109,6 +110,34 @@ export function buildApp() {
   app.get("/api/agents/:id/links", wrap((c) => core.links(c.get("member"), c.req.param("id")!, base(c))));
   app.get("/api/agents/:id/public", wrap((c) => core.publicInfo(c.get("member"), c.req.param("id")!)));
   app.get("/api/agents/:id/history", wrap((c) => core.history(c.get("member"), c.req.param("id")!)));
+  app.post("/api/agents/:id/chat", async (c, next) => {
+    if (c.req.query("stream") !== "1") return next();
+    // Streaming: status → sources → (action) → reply → done, or a single error event.
+    // Runs inside the same sandbox/auth middleware, so `db` is still the visitor's sandbox.
+    const b = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const m = c.get("member"), agentId = c.req.param("id")!;
+    const text = String(b.text ?? "").slice(0, 2000), img = typeof b.imageDataUrl === "string" ? b.imageDataUrl : undefined;
+    return streamSSE(c, async (stream) => {
+      const t0 = performance.now();
+      let firstSources: number | undefined;
+      let q = Promise.resolve();
+      const send = (event: string, data: unknown) => { q = q.then(() => stream.writeSSE({ event, data: JSON.stringify(data) })).catch(() => {}); };
+      try {
+        const out = await core.chat(m, agentId, text, img, (name, data) => {
+          if (name === "sources" && firstSources === undefined) firstSources = Math.round(performance.now() - t0);
+          send(name, data);
+        });
+        const ms = Math.round(performance.now() - t0);
+        console.log(`[chat] first-sources=${firstSources ?? "-"}ms reply=${ms}ms`);
+        send("reply", { ...out, ms });
+        send("done", {});
+      } catch (e) {
+        if (e instanceof core.HttpError) send("error", e.body);
+        else { console.error(e); send("error", { error: "server_error", reply: "Something went wrong. Try again." }); }
+      }
+      await q;
+    });
+  });
   app.post("/api/agents/:id/chat", wrap(async (c) => {
     const b = await c.req.json();
     return core.chat(c.get("member"), c.req.param("id")!, String(b.text ?? "").slice(0, 2000), typeof b.imageDataUrl === "string" ? b.imageDataUrl : undefined);

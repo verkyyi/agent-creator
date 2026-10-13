@@ -244,13 +244,78 @@ async function send(text, img) {
   sending++;
   try { await sendInner(text, img); } finally { sending--; }
 }
+/* Pending bubble: typing dots + the server's status line, then "Found in" chips once retrieval is done. */
+function pendingBubble() {
+  const status = h("span", { class: "pending-status" });
+  const found = h("div", { class: "cites found", hidden: true });
+  const el = h("div", { class: "msg in pending", "aria-live": "polite", "data-testid": "pending" },
+    h("div", { class: "typing", "aria-label": "Thinking" }, h("i"), h("i"), h("i")), status, found);
+  return {
+    el,
+    status(s) { status.textContent = lang === "es" ? "Revisando las notas…" : s || ""; scrollToEnd(chat); },
+    sources(cites) {
+      if (!cites?.length) return;
+      found.innerHTML = "";
+      for (const c of cites.slice(0, 3)) found.append(citeChip(c, id, { prefix: lang === "es" ? "Encontrado en" : "Found in", loading: t().loading }));
+      found.hidden = false; scrollToEnd(chat);
+    },
+  };
+}
+
+/* POST …/chat?stream=1 and read the SSE stream. Resolves to the same { ok, status, data } shape as api().
+   A JSON response (pwa.js offline outbox 202, 401 from the auth middleware) is passed through as-is.
+   Returns null when nothing came back at all, so the caller can use the plain route. */
+async function streamChat(body, pending) {
+  let res;
+  try {
+    res = await fetch(`api/agents/${encodeURIComponent(id)}/chat?stream=1`, {
+      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify(body),
+    });
+  } catch { return null; }
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("text/event-stream") || !res.body) {
+    let data = {};
+    try { data = await res.json(); } catch { /* empty */ }
+    return { ok: res.ok, status: res.status, data };
+  }
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = "", got = false, final = null;
+  const handle = (block) => {
+    let event = "message"; const lines = [];
+    for (const l of block.split(/\r?\n/)) {
+      if (l.startsWith("event:")) event = l.slice(6).trim();
+      else if (l.startsWith("data:")) lines.push(l.slice(5).replace(/^ /, ""));
+    }
+    let data = {};
+    try { data = lines.length ? JSON.parse(lines.join("\n")) : {}; } catch { return; }
+    got = true;
+    if (event === "status") pending.status(data.text);
+    else if (event === "sources") pending.sources(data.citations);
+    else if (event === "reply") final = { ok: true, status: 200, data };
+    else if (event === "error") final = { ok: false, status: data.error === "ended" ? 410 : data.error === "forbidden" ? 403 : data.error === "not_found" ? 404 : 500, data };
+  };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.search(/\r?\n\r?\n/)) >= 0) { handle(buf.slice(0, i)); buf = buf.slice(i).replace(/^\r?\n\r?\n/, ""); }
+    }
+    if (buf.trim()) handle(buf);
+  } catch { /* connection dropped mid-stream */ }
+  if (final) return final;
+  // The server saw the message (events arrived) but the reply never did: don't resend it.
+  return got ? { ok: false, status: 0, data: { error: t().sendFail } } : null;
+}
+
 async function sendInner(text, img) {
   userBubble(text, img);
-  const typing = typingBubble(); chat.append(typing); scrollToEnd(chat);
+  const pending = pendingBubble(); chat.append(pending.el); scrollToEnd(chat);
   const body = { text: text || (img ? t().herePhoto : "") };
   if (img) body.imageDataUrl = img;
-  const r = await api(`api/agents/${encodeURIComponent(id)}/chat`, body);
-  typing.remove();
+  const r = (await streamChat(body, pending)) || (await api(`api/agents/${encodeURIComponent(id)}/chat`, body));
+  pending.el.remove();
   if (r.status === 410) { endHelper(r.data.state, r.data.reply); return; }
   if (r.status === 401) { authLost(); return; }
   if (!r.ok) { helperMessage({ reply: r.data.reply || r.data.error || t().sendFail, refused: !!r.data.reply }); return; }
