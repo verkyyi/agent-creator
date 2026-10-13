@@ -116,7 +116,7 @@ function renderHeader() {
   $("#h-name").textContent = info.name;
   $("#h-sub").textContent = [info.tenantName, info.job].filter(Boolean).join(" · ");
   $("#h-ends-text").textContent = `${t().ends} ${info.endsLabel || ""}`;
-  $("#h-cando").textContent = info.canDo?.length ? t().canDo + ": " + info.canDo.map((c) => c.name.toLowerCase()).join(", ") : "";
+  $("#h-cando").textContent = info.canDo?.length ? t().canDo + ": " + info.canDo.map((c) => c.name.replace(/^[A-Z](?=[a-z])/, (x) => x.toLowerCase())).join(", ") : "";
   $("#expiry-bar").hidden = false;
 }
 
