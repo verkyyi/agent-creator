@@ -7,7 +7,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { db, id, now, record, save } from "./store.ts";
+import { db, id, now, record, save, isDefaultSandbox } from "./store.ts";
 import { aclFor, hydraIngest, hydraState, localSearch, principalsFor, sharingFromLabel } from "./retrieval.ts";
 import * as core from "./core.ts";
 import { dbName, hydraCall, hydraOn } from "./memory.ts";
@@ -125,7 +125,7 @@ async function extract(file: File): Promise<{ text?: string; kind: string }> {
 }
 
 async function hydraIngestFile(tenantId: string, s: Source, file: File) {
-  if (!hydraOn()) return;
+  if (!hydraOn() || !isDefaultSandbox()) return; // the shared index holds the seed only (retrieval.ts)
   const form = new FormData();
   form.set("type", "knowledge");
   form.set("database", dbName(tenantId));

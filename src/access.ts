@@ -4,6 +4,7 @@ import type { MiddlewareHandler } from "hono";
 import type { Member } from "./types.ts";
 
 // One JSON line per request in logs/access.log: who came, from where, what they hit.
+// `sandbox` is the visitor's sandbox id (one per demo visitor; "default" = none).
 // Never a cookie, a token, a query string or a body. Rolled by day (access-YYYY-MM-DD.log)
 // and by size, kept for KEEP_DAYS.
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -53,7 +54,7 @@ export function writeAccess(entry: Record<string, unknown>) {
 }
 const statSize = (f: string) => { try { return statSync(f).size; } catch { return 0; } };
 
-export function accessLog(who: (cookie: string | undefined) => Member | undefined): MiddlewareHandler {
+export function accessLog(who: (cookie: string | undefined) => Member | undefined, sandbox: () => string): MiddlewareHandler {
   return async (c, next) => {
     const t0 = performance.now();
     let status = 500;
@@ -76,6 +77,7 @@ export function accessLog(who: (cookie: string | undefined) => Member | undefine
         ua: h("user-agent")?.slice(0, 300),
         referer: cleanReferer(h("referer")),
         tsLogin: h("tailscale-user-login") || undefined,
+        sandbox: sandbox(),
         tenant: m?.tenantId,
         member: m?.id,
       });

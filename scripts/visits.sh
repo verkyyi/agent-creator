@@ -1,6 +1,6 @@
 #!/bin/bash
 # Daily visit summary from logs/access.log (+ rolled access-*.log):
-# requests, unique IPs, page views, signed-in members, top referers.
+# requests, unique IPs, visitors (sandboxes), page views, signed-in members, top referers.
 #   scripts/visits.sh [days=7] [log dir=logs]
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -18,10 +18,11 @@ for (const f of readdirSync(dir).filter((f) => /^access.*\.log$/.test(f))) {
     let e; try { e = JSON.parse(line); } catch { continue; }
     const d = String(e.ts || "").slice(0, 10);
     if (d < since) continue;
-    const s = byDay.get(d) ?? { req: 0, ips: new Set(), pages: 0, members: new Set(), refs: new Map() };
+    const s = byDay.get(d) ?? { req: 0, ips: new Set(), sbs: new Set(), pages: 0, members: new Set(), refs: new Map() };
     s.req++;
     if (e.ip) s.ips.add(e.ip);
     if (e.member) s.members.add(e.member);
+    if (e.sandbox && e.sandbox !== "default") s.sbs.add(e.sandbox);
     const p = String(e.path || "").replace(/^\/crewbrain/, "") || "/";
     if (e.method === "GET" && (p === "/" || p.endsWith(".html") || p.startsWith("/i/"))) s.pages++;
     if (e.referer) { const h = (() => { try { return new URL(e.referer).host; } catch { return e.referer; } })(); s.refs.set(h, (s.refs.get(h) ?? 0) + 1); }
@@ -29,9 +30,9 @@ for (const f of readdirSync(dir).filter((f) => /^access.*\.log$/.test(f))) {
   }
 }
 if (!byDay.size) { console.log(`no visits since ${since}`); process.exit(0); }
-console.log("date        requests  unique_ips  page_views  members  top_referers");
+console.log("date        requests  unique_ips  visitors  page_views  members  top_referers");
 for (const [d, s] of [...byDay].sort()) {
   const refs = [...s.refs].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([h, n]) => `${h}(${n})`).join(" ") || "-";
-  console.log(`${d}  ${String(s.req).padStart(8)}  ${String(s.ips.size).padStart(10)}  ${String(s.pages).padStart(10)}  ${String(s.members.size).padStart(7)}  ${refs}`);
+  console.log(`${d}  ${String(s.req).padStart(8)}  ${String(s.ips.size).padStart(10)}  ${String(s.sbs.size).padStart(8)}  ${String(s.pages).padStart(10)}  ${String(s.members.size).padStart(7)}  ${refs}`);
 }
 JS

@@ -1,9 +1,8 @@
-import { db, now, record, id, hashConfig, save } from "./store.ts";
+import { db, now, record, id, hashConfig, save, inviteToken, isDefaultSandbox } from "./store.ts";
 import { aclFor, hydraIngest, hydraSetAcl, localSearch, principalsFor, search } from "./retrieval.ts";
 import { claude, llmStatus } from "./llm.ts";
 import { remember, recall, forgetAgent } from "./memory.ts";
 import { ask as askBrain } from "./brain.ts";
-import { DEMO_TOKENS } from "./seed.ts";
 import type { Agent, AgentConfig, Member, Revision, Source, Template, Group, Cite, Sharing } from "./types.ts";
 
 export class HttpError extends Error {
@@ -322,7 +321,7 @@ export function approve(owner: Member, agentId: string, rev: number, base: strin
 export function links(owner: Member, agentId: string, base: string) {
   const a = ownAgent(owner, agentId);
   const g = groupById(cfgOf(a).audienceGroupId)!;
-  return { links: g.memberIds.map((mid) => ({ memberId: mid, name: memberById(mid)!.name, url: `${base}i/${DEMO_TOKENS[mid]}?a=${a.id}` })) };
+  return { links: g.memberIds.map((mid) => ({ memberId: mid, name: memberById(mid)!.name, url: `${base}i/${inviteToken(mid)}?a=${a.id}` })) };
 }
 
 function ownAgent(owner: Member, agentId: string) {

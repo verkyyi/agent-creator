@@ -53,12 +53,14 @@ npm ci --include=optional   # the Agent SDK's native Claude binary is an optiona
 security add-generic-password -a crewbrain -s HYDRA_DB_API_KEY -w <key>   # also OPENAI_API_KEY, CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
 ./scripts/start.sh          # http://127.0.0.1:8787/demo.html
 ./scripts/deploy.sh         # test-gated deploy to the mini
-scripts/visits.sh [days]    # daily requests, unique IPs, page views, members, referers
+scripts/visits.sh [days]    # daily requests, unique IPs, visitors, page views, members, referers
 ```
 
 **Claude.** Auth is `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), read from the Keychain by `scripts/start.sh`; it never reaches a log or a response. Models are limited to Sonnet 5.5 (default) and Haiku 5.5. An SDK error (e.g. "Not logged in") is never shown as a reply: helpers answer from the notes and say in plain words that the AI is unavailable.
 
-**Access log.** `logs/access.log` (override with `ACCESS_LOG_DIR`), one JSON line per request: time, method, path, status, ms, client IP (`X-Forwarded-For` from Funnel), User-Agent, Referer, tenant/member. Never cookies, tokens, query strings or bodies; invite tokens in paths are masked. Rolled daily and at 10 MB, kept 30 days.
+**Sandboxes.** Each demo visitor gets their own sandbox on first visit to the demo page: a fresh copy of both companies and all seven identities, with random invite tokens, stored in `data/sandboxes/<id>.json` (`SANDBOX_DIR`). Every read and write (chats, creator, drafts, inbox, photos, knowledge, approvals, events, memories, clock) stays in it. A sandbox unseen for 7 days is deleted (`SANDBOX_TTL_DAYS`); at most 500 are kept, oldest dropped first (`SANDBOX_MAX`). `/api/reset` and `/api/clock` (owner, `TEST_CLOCK=1`) act on the caller's sandbox only. The fixed tokens in `src/seed.ts` work only in tests or with `DEMO_LEGACY_TOKENS=1` (local dev, video recording). On first start the old `data/db.json` is renamed to `data/db.json.archived-<date>`, never deleted.
+
+**Access log.** `logs/access.log` (override with `ACCESS_LOG_DIR`), one JSON line per request: time, method, path, status, ms, client IP (`X-Forwarded-For` from Funnel), User-Agent, Referer, sandbox (one per visitor), tenant/member. Never cookies, tokens, query strings or bodies; invite tokens in paths are masked. Rolled daily and at 10 MB, kept 30 days.
 
 **Deploy on the mini by hand** (as the service's user): `git pull && npm ci --include=optional && launchctl kickstart -k gui/$(id -u)/com.verkyyi.crewbrain`.
 

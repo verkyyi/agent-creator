@@ -3,8 +3,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { getCookie, setCookie } from "hono/cookie";
 import { randomBytes } from "node:crypto";
-import { db, now, record, reset, save } from "./store.ts";
-import { DEMO_TOKENS } from "./seed.ts";
+import { db, now, record, reset, save, createSandbox, getSandbox, inSandbox, inviteToken, isDefaultSandbox, resolveInvite, sandboxId, gc, archiveLegacyFile, type Sandbox } from "./store.ts";
 import { hydraBoot, hydraIngest, hydraState, sharingFromLabel } from "./retrieval.ts";
 import * as core from "./core.ts";
 import { voiceRoutes } from "./voice.ts";
@@ -30,6 +29,22 @@ function base(c: Context) {
   return `${proto}://${host}${u.pathname.startsWith("/crewbrain") ? "/crewbrain/" : "/"}`;
 }
 
+function cookieOpts(c: Context) {
+  const https = base(c).startsWith("https");
+  // SameSite=None lets the demo work inside the landing page's embedded phone (a different site).
+  return { httpOnly: true, sameSite: https ? "None" : "Lax", path: "/", secure: https, maxAge: 60 * 60 * 24 * 30 } as const;
+}
+
+// Which sandbox a request belongs to: the invite in the path, else the signed-in session's,
+// else the visitor's sandbox cookie. None = the default sandbox (no identities in production).
+function sandboxOf(c: Context): Sandbox | undefined {
+  const inv = /\/i\/([^/?#]+)/.exec(c.req.path)?.[1];
+  if (inv) return resolveInvite(decodeURIComponent(inv))?.sb;
+  const sess = getCookie(c, "cb_session");
+  const own = sess?.includes(".") ? getSandbox(sess.split(".")[0]) : undefined;
+  return own ?? getSandbox(getCookie(c, "cb_sandbox"));
+}
+
 const wrap = (fn: (c: Context<Env>) => unknown) => async (c: Context<Env>) => {
   try {
     return c.json((await fn(c)) as object);
@@ -44,16 +59,17 @@ export function buildApp() {
   const app = new Hono<Env>();
 
   app.get("/i/:token", (c) => {
-    const mid = Object.entries(DEMO_TOKENS).find(([, t]) => t === c.req.param("token"))?.[0];
-    const m = mid && core.memberById(mid);
+    // The sandbox middleware already entered the token's sandbox.
+    const inv = resolveInvite(c.req.param("token"));
+    const m = inv && core.memberById(inv.memberId);
     if (!m) return c.text("This link isn't valid.", 404);
-    const token = randomBytes(18).toString("hex");
+    const rand = randomBytes(18).toString("hex");
+    const token = isDefaultSandbox() ? rand : `${sandboxId()}.${rand}`;
     db.sessions.push({ token, memberId: m.id, tenantId: m.tenantId });
     save();
     record({ tenantId: m.tenantId, actorId: m.id, kind: "session.start" });
-    const https = base(c).startsWith("https");
-    // SameSite=None lets the demo work inside the landing page's embedded phone (a different site).
-    setCookie(c, "cb_session", token, { httpOnly: true, sameSite: https ? "None" : "Lax", path: "/", secure: https, maxAge: 60 * 60 * 24 * 30 });
+    setCookie(c, "cb_session", token, cookieOpts(c));
+    if (!isDefaultSandbox()) setCookie(c, "cb_sandbox", sandboxId(), cookieOpts(c));
     const a = c.req.query("a") ?? core.helpersFor(m).find((x) => x.state === "active")?.id;
     return c.redirect(m.role === "owner" ? "../" : a ? `../a.html?id=${a}` : "../a.html");
   });
@@ -65,7 +81,9 @@ export function buildApp() {
       marco: "Bay Roofing crew. Uses Rex (try Spanish).", tess: "Bay Roofing crew. Uses Rex.",
       zed: "Not invited. Every helper should refuse.", gail: "Owner of a different company. Sees nothing of Rivera's.",
     };
-    return c.json({ identities: Object.entries(DEMO_TOKENS).map(([mid, t]) => ({ name: core.memberById(mid)!.name, role: core.memberById(mid)!.role, description: desc[mid], url: `${base(c)}i/${t}` })) });
+    // A first visit gets its own sandbox; the list only ever names this visitor's identities.
+    if (isDefaultSandbox()) setCookie(c, "cb_sandbox", createSandbox().id, cookieOpts(c));
+    return c.json({ identities: db.members.map((m) => ({ name: m.name, role: m.role, description: desc[m.id], url: `${base(c)}i/${inviteToken(m.id)}` })) });
   });
 
   app.get("/api/health", (c) => c.json({ ok: true, now: now().toISOString(), hydra: hydraState, claude: llmConfigured(), voice: !!process.env.OPENAI_API_KEY }));
@@ -125,8 +143,8 @@ export function buildApp() {
   }));
   app.post("/api/reset", wrap((c) => {
     if (process.env.TEST_CLOCK !== "1" || c.get("member").role !== "owner") throw new core.HttpError(403, { error: "forbidden" });
-    reset();
-    for (const t of db.tenants) void hydraIngest(t.id, db.sources.filter((s) => s.tenantId === t.id)).catch(() => {});
+    reset(); // the caller's own sandbox only
+    if (isDefaultSandbox()) for (const t of db.tenants) void hydraIngest(t.id, db.sources.filter((s) => s.tenantId === t.id)).catch(() => {});
     return { ok: true };
   }));
 
@@ -138,7 +156,8 @@ export function buildApp() {
   app.get("/", serveStatic({ path: "./public/index.html" }));
 
   const root = new Hono<Env>();
-  root.use("*", accessLog(memberForToken));
+  root.use("*", (c, next) => inSandbox(sandboxOf(c), next));
+  root.use("*", accessLog(memberForToken, sandboxId));
   root.route("/crewbrain", app);
   root.route("/", app);
   return root;
@@ -148,4 +167,7 @@ if (process.env.NODE_ENV !== "test") {
   const port = Number(process.env.PORT ?? 8787);
   serve({ fetch: buildApp().fetch, port, hostname: "127.0.0.1" }, () => console.log(`crewbrain on http://127.0.0.1:${port}/`));
   for (const t of db.tenants) void hydraBoot(t.id, db.sources.filter((s) => s.tenantId === t.id));
+  archiveLegacyFile();
+  gc();
+  setInterval(() => gc(), 60 * 60 * 1000).unref();
 }
