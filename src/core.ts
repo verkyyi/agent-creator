@@ -1,3 +1,4 @@
+import { raceAnswer } from "./fastllm.ts";
 import { db, now, record, id, hashConfig, save, inviteToken, isDefaultSandbox } from "./store.ts";
 import { aclFor, graphQuery, hydraFeedback, hydraIngest, hydraReady, hydraSetAcl, localSearch, principalsFor, search } from "./retrieval.ts";
 import { claude, llmStatus } from "./llm.ts";
@@ -558,7 +559,8 @@ End with the excerpt numbers you used in the form USED:1,2 on its own last line.
   // Short context answers fast on Haiku; longer excerpts get Sonnet.
   const ctxChars = chunks.reduce((n, x) => n + x.text.length, 0) + toolNote.length;
   const model = ctxChars < 1500 ? "claude-haiku-5-5" : "claude-sonnet-5-5";
-  const llm = await claude(system, `Excerpts:\n${excerpts || "(none)"}\n${toolNote ? `Tool data: ${toolNote}\n` : ""}\nQuestion: ${text}`, { timeoutMs: 20000, model });
+  const userPrompt = `Excerpts:\n${excerpts || "(none)"}\n${toolNote ? `Tool data: ${toolNote}\n` : ""}\nQuestion: ${text}`;
+  const llm = await raceAnswer(() => claude(system, userPrompt, { timeoutMs: 20000, model }), system, userPrompt);
   let reply: string;
   let used = chunks.slice(0, 1);
   if (llm) {
