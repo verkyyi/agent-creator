@@ -38,7 +38,7 @@ const enabled = () => llmConfigured() && (process.env.NODE_ENV !== "test" || !!q
 const WARM_SYSTEM = "Follow the instructions given at the top of the user's message exactly. They define your role, rules and output format.";
 type Warm = { send: (text: string) => void; result: Promise<string | null>; born: number };
 const pools = new Map<string, Warm[]>();
-const POOL_SIZE = Number(process.env.CLAUDE_WARM ?? 2);
+const POOL_SIZE = Number(process.env.CLAUDE_WARM ?? 3);
 const WARM_TTL_MS = 4 * 60_000; // retire before an idle session can go stale
 
 function spawnWarm(model: string): Warm {
@@ -90,8 +90,24 @@ export async function claude(system: string, prompt: string, opts: { model?: str
   if (!opts.images?.length) {
     const w = takeWarm(pickModel(opts.model ?? process.env.CLAUDE_MODEL));
     if (w) {
-      w.send(`<instructions>\n${system}\n</instructions>\n\n${prompt}`);
-      const out = await Promise.race([w.result, new Promise<null>((r) => setTimeout(() => r(null), opts.timeoutMs ?? 20000))]);
+      const model = pickModel(opts.model ?? process.env.CLAUDE_MODEL);
+      const msg = `<instructions>\n${system}\n</instructions>\n\n${prompt}`;
+      let settled = false;
+      w.result.then((x) => { if (x) settled = true; });
+      w.send(msg);
+      // Hedge: a session that isn't ready yet shouldn't hold the answer hostage.
+      const hedge = new Promise<string | null>((r) => setTimeout(() => {
+        if (settled) return;
+        const w2 = takeWarm(model);
+        if (!w2) return;
+        w2.send(msg);
+        w2.result.then(r);
+      }, 3000));
+      const out = await Promise.race([
+        w.result.then((x) => x ?? hedge),
+        hedge,
+        new Promise<null>((r) => setTimeout(() => r(null), opts.timeoutMs ?? 20000)),
+      ]);
       mark(!!out);
       return out;
     }
