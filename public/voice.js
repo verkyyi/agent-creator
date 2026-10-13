@@ -1,8 +1,8 @@
-// Crewbrain voice layer — OpenAI Realtime (speech-to-speech) over WebRTC.
+// CrewBrain voice layer — OpenAI Realtime (speech-to-speech) over WebRTC.
 // mode "agent": gpt-realtime answers directly; facts come only from server-gated tools
 //   (search_brain, log_issue, request_walkthrough) executed at api/voice/tool.
 // mode "creator": the model is only a voice; every utterance is relayed to the backend via `relay`.
-// All Crewbrain URLs are RELATIVE (the app is mounted at / and /crewbrain/).
+// All CrewBrain URLs are RELATIVE (the app is mounted at / and /crewbrain/).
 
 const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 const CHECKIN_MS = 8000;

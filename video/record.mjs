@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Drive the REAL Crewbrain app in a phone viewport and record one webm per shot into video/out/raw/.
+// Drive the REAL CrewBrain app in a phone viewport and record one webm per shot into video/out/raw/.
 // Each shot also writes raw/<name>.json: { marks: { name: seconds }, cuts: [[from, to], ...] }.
 // `marks` are story beats compose.mjs can split a take on; `cuts` are waits (server, network, polling)
 // that compose removes, so the cut never shows anybody waiting.

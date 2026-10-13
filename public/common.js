@@ -1,4 +1,4 @@
-// Shared helpers for the Crewbrain owner app and helper chat. Relative URLs only.
+// Shared helpers for the CrewBrain owner app and helper chat. Relative URLs only.
 
 import { icon as svgIcon, avatarKey, ICON_NAMES } from "./icons.js";
 import { ot, ownerLocale } from "./strings.js";

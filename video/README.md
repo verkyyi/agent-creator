@@ -1,4 +1,4 @@
-# Crewbrain demo video pipeline
+# CrewBrain demo video pipeline
 
 Produces `video/out/crewbrain-demo-v3.mp4`: 1920x1080, 30 fps, H.264 + AAC, about 3:10, narration at −16 LUFS over a quiet synthesized music bed, subtitles burned in. A sidecar `out/crewbrain-demo-v3.srt` and a contact sheet are written too.
 

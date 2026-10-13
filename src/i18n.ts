@@ -158,7 +158,7 @@ async function translatePart(lang: string, en: Record<string, unknown>): Promise
       body: JSON.stringify({
         model: process.env.OPENAI_FAST_MODEL ?? "gpt-4.1-mini", temperature: 0, response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: `You translate an app's UI strings from English into the language with BCP-47 code "${lang}". Return a JSON object with exactly the same keys and nesting; every value a string (arrays keep the same length). Translate exactly and naturally for a mobile app; keep {placeholders}, numbers and the "…" character unchanged. Do not translate proper names: the product name "Crewbrain", people's, helpers' and company names, codes. Output only the JSON.` },
+          { role: "system", content: `You translate an app's UI strings from English into the language with BCP-47 code "${lang}". Return a JSON object with exactly the same keys and nesting; every value a string (arrays keep the same length). Translate exactly and naturally for a mobile app; keep {placeholders}, numbers and the "…" character unchanged. Do not translate proper names: the product name "CrewBrain", people's, helpers' and company names, codes. Output only the JSON.` },
           { role: "user", content: JSON.stringify(en) },
         ],
       }),

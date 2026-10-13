@@ -1,4 +1,4 @@
-// Crewbrain's one icon set: plain line icons (24px grid, 2px stroke, round ends), drawn in
+// CrewBrain's one icon set: plain line icons (24px grid, 2px stroke, round ends), drawn in
 // currentColor so they take the color of the text around them. No emoji anywhere in the UI.
 
 const P = {

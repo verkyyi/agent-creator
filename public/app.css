@@ -1,4 +1,4 @@
-/* Crewbrain app — job-site work order. Mobile-first: base rules are a 390px phone; min-width queries add width. */
+/* CrewBrain app — job-site work order. Mobile-first: base rules are a 390px phone; min-width queries add width. */
 :root {
   --paper: #eef1f4; --sheet: #ffffff; --ink: #14181f; --muted: #56606e; --line: #c9d1db;
   --chalk: #1d5fc4; --chalk-soft: #dbe6f7; --tag: #f5c400; --tag-ink: #1a1500;

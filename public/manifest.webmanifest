@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Crewbrain",
-  "short_name": "Crewbrain",
+  "name": "CrewBrain",
+  "short_name": "CrewBrain",
   "description": "Make scoped, expiring helpers for your customers and crews — they know your business and only what you allow.",
   "lang": "en",
   "dir": "ltr",

@@ -582,7 +582,7 @@ async function offlineCreator(owner: Member, text: string, base: string): Promis
   if (/close[sd]?\b|job closes|until the job/.test(t) && !draft.expiresAt) draft.expiresAt = parseExpiry("friday 6pm", tenant.timeZone);
 
   if (!draft.templateId && !draft.audienceGroupId) {
-    const llm = await claude("You are the Crewbrain creator for a small contractor. In one or two short sentences, tell the owner you can make a homeowner helper or a crew briefing from their approved company knowledge, and ask who it is for. No lists. Reply in the language the owner wrote in, whatever language it is.", text, { timeoutMs: 12000 });
+    const llm = await claude("You are the CrewBrain creator for a small contractor. In one or two short sentences, tell the owner you can make a homeowner helper or a crew briefing from their approved company knowledge, and ask who it is for. No lists. Reply in the language the owner wrote in, whatever language it is.", text, { timeoutMs: 12000 });
     return say(llm ?? "I can make a homeowner helper or a crew briefing from your approved knowledge. Who is it for?");
   }
   if (!draft.templateId) draft.templateId = groupById(draft.audienceGroupId!)!.kind === "crew" ? "crew_briefing" : "homeowner_helper";

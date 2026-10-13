@@ -192,7 +192,7 @@ function voiceResults(j) {
 }
 wireVoice({
   btn: $("#mic-btn"), stateEl: $("#voice-state"), mode: "creator", log,
-  get texts() { return { connecting: ot("voice.connecting"), helper: "Crewbrain" }; },
+  get texts() { return { connecting: ot("voice.connecting"), helper: "CrewBrain" }; },
   onReply: (json) => { if (json?.agent) upsertHelper(json.agent); },
   summarize: voiceResults,
   tapCard: voiceTapCard,
@@ -629,7 +629,7 @@ function showOnboarding() {
   };
   next.addEventListener("click", () => { if (i < SLIDES.length - 1) { i++; render(); } else finish(); });
   const ov = h("div", { class: "onboard", role: "dialog", "aria-modal": "true", "aria-labelledby": "ob-title", "data-testid": "onboarding" },
-    h("div", { class: "ob-top" }, h("span", { class: "brand" }, h("span", { class: "brand-mark", "aria-hidden": "true" }), "Crewbrain"), skip),
+    h("div", { class: "ob-top" }, h("span", { class: "brand" }, h("span", { class: "brand-mark", "aria-hidden": "true" }), "CrewBrain"), skip),
     body, h("div", { class: "ob-foot" }, dots, next));
   document.body.append(ov);
   render();

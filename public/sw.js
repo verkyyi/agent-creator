@@ -1,4 +1,4 @@
-/* Crewbrain service worker.
+/* CrewBrain service worker.
  * Every path is relative to the registration scope, so the app works under any sub-path (e.g. /crewbrain/).
  * Bump VERSION whenever the app shell changes. */
 const VERSION = "v-i18n";
@@ -192,13 +192,13 @@ async function apiNetworkFirst(req) {
     const cached = await cache.match(req);
     if (cached) {
       const headers = new Headers(cached.headers);
-      headers.set("X-Crewbrain-Offline", "1");
+      headers.set("X-CrewBrain-Offline", "1");
       const body = await cached.blob();
       return new Response(body, { status: cached.status, statusText: cached.statusText, headers });
     }
     return new Response(JSON.stringify({ error: "offline", offline: true }), {
       status: 503,
-      headers: { "Content-Type": "application/json", "X-Crewbrain-Offline": "1" },
+      headers: { "Content-Type": "application/json", "X-CrewBrain-Offline": "1" },
     });
   }
 }

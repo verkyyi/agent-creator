@@ -1,4 +1,4 @@
-// Shared helpers for the Crewbrain demo video pipeline.
+// Shared helpers for the CrewBrain demo video pipeline.
 import { execFileSync, spawn } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";

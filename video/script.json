@@ -1,5 +1,5 @@
 {
-  "title": "Crewbrain — demo v3",
+  "title": "CrewBrain — demo v3",
   "voice": "cedar",
   "ttsInstructions": "Speak like a calm, confident product founder showing a colleague something that works. Plain, warm and direct, a brisk but unhurried pace, no hype. Short natural pauses between sentences.",
   "ownerVoice": {
@@ -39,7 +39,7 @@
         "scene": "titlecard"
       },
       "minLen": 11,
-      "narration": "Crewbrain turns what's in the owner's head into voice helpers. Say one sentence to create one. They only see what they should. And they switch off when the job is done."
+      "narration": "CrewBrain turns what's in the owner's head into voice helpers. Say one sentence to create one. They only see what they should. And they switch off when the job is done."
     },
     {
       "id": "h1-mic",
@@ -82,7 +82,7 @@
       "kicker": "1 · Say it, get a helper",
       "headline": "One card to approve.",
       "caption": "Who it's for, what it knows, what it can do, when it ends.",
-      "narration": "Crewbrain heard who it's for, which job, and when it ends. Claude works out the rest: what the crew may know, what Rex can do, and what it can't see, like the price book. It all fits on one card, and nothing goes live until Sam approves."
+      "narration": "CrewBrain heard who it's for, which job, and when it ends. Claude works out the rest: what the crew may know, what Rex can do, and what it can't see, like the price book. It all fits on one card, and nothing goes live until Sam approves."
     },
     {
       "id": "h1-share",
@@ -294,7 +294,7 @@
         "scene": "closing"
       },
       "minLen": 7.0,
-      "narration": "Crewbrain. Your company's know-how, on every job, with the right access, for the right amount of time."
+      "narration": "CrewBrain. Your company's know-how, on every job, with the right access, for the right amount of time."
     }
   ]
 }

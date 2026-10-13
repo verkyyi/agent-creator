@@ -32,7 +32,7 @@ export const EN = {
   home: ["Will my fridge stay on in a blackout?", "When is the inspection?", "Can we add a second battery later?"],
   company: "your contractor",
   owner: {
-    menu: { more: "More", chat: "Chat with Crewbrain", helpers: "My helpers", inbox: "Inbox", brain: "Brain", how: "How it works", switch: "Switch person (demo)", backChat: "Chat" },
+    menu: { more: "More", chat: "Chat with CrewBrain", helpers: "My helpers", inbox: "Inbox", brain: "Brain", how: "How it works", switch: "Switch person (demo)", backChat: "Chat" },
     clock: { title: "Demo clock", advance: "Skip ahead 1 day", reset: "Reset clock", off: "The demo clock is turned off on this server.", now: "Now: {t}", wasReset: "Clock reset.", skipped: "Skipped ahead 1 day." },
     views: {
       brainTitle: "Brain", brainSub: "Everything you know, with a lock on every page.",
@@ -41,7 +41,7 @@ export const EN = {
     },
     create: {
       title: "What do you need?",
-      intro: "Tap the yellow mic and say it like you'd tell your office manager. Make a helper, teach Crewbrain something, or ask what's new. Or tap one of these:",
+      intro: "Tap the yellow mic and say it like you'd tell your office manager. Make a helper, teach CrewBrain something, or ask what's new. Or tap one of these:",
       trySaying: "Try saying",
       suggestions: [
         "Make a helper for the Patels about their install, until 30 days after handover",
@@ -79,7 +79,7 @@ export const EN = {
     },
     pill: { live: "Live", waiting: "Waiting for your OK", ended: "Ended" },
     brainTab: {
-      snap: "Teach from a photo", empty: "Nothing here yet. Snap a photo of a warranty card or site note to teach Crewbrain.",
+      snap: "Teach from a photo", empty: "Nothing here yet. Snap a photo of a warranty card or site note to teach CrewBrain.",
       updated: "Updated {d}", updatedWord: "updated", saveWho: "Save who can see this", nowVisible: "Now visible to: {l}", version: "Version {v}",
       whoSee: "Who can see this", yourPhoto: "Your photo", reading: "Reading your photo…", saveBrain: "Save to my Brain", saving: "Saving…",
       added: "Added: {t}", newKnowledge: "new knowledge", checkTitle: "Check what I read",
@@ -101,11 +101,11 @@ export const EN = {
     ob: {
       skip: "Skip", step: "{i} of {n}", start: "Start", next: "Next",
       s1Title: "Your company brain", s1Text: "Everything you know about your jobs, in one place. Every page has a lock, so you decide who can see it: just the office, your crew, or the homeowner.",
-      s2Title: "Say who needs help", s2Text: "Tap the mic and talk like you'd tell your office manager: who it's for, what job, and until when. Crewbrain asks if anything is missing.",
+      s2Title: "Say who needs help", s2Text: "Tap the mic and talk like you'd tell your office manager: who it's for, what job, and until when. CrewBrain asks if anything is missing.",
       s3Title: "You approve, they get a link", s3Text: "Nothing goes live without your OK. Each person gets their own link, and it shuts off by itself when the job ends.",
     },
 cards: {
-      noReach: "Can't reach Crewbrain. Check your signal and try again.", yourHelper: "your helper", sendName: "Send {n}",
+      noReach: "Can't reach CrewBrain. Check your signal and try again.", yourHelper: "your helper", sendName: "Send {n}",
       copied: "Copied", holdToCopy: "Hold to copy", copy: "Copy", text: "Text", smsBody: "Here's your link for {n}: {url}",
       worksUntil: "Works until {e}", andMore: "and {n} more", noLinks: "No links yet. Approve the helper first.",
       sendEveryone: "Send to everyone", showQr: "Show QR codes",
@@ -136,7 +136,7 @@ cards: {
       title: "Your company brain", intro: "Everything your helpers can know. Each piece has a lock that decides who can find it.",
       foot: "Stored in your private HydraDB brain. Each lock decides who can find it.",
       addKnowledge: "Add knowledge", snap: "Snap a photo", askPh: "Ask your brain — e.g. gate code, warranty", askAria: "Ask your brain", search: "Search",
-      loadFail: "Couldn't load the brain.", empty: "Nothing here yet. Tap Add knowledge to teach Crewbrain.", updated: "Updated {d}",
+      loadFail: "Couldn't load the brain.", empty: "Nothing here yet. Tap Add knowledge to teach CrewBrain.", updated: "Updated {d}",
       searching: "Searching…", searchFail: "Couldn't search.", noMatch: "Nothing in your brain matches that yet.",
       loading: "Loading…", textFail: "Couldn't load the text.", whoCanFind: "Who can find this",
       lockFail: "Couldn't change the lock.", locked: "Locked: {l}", added: "Added: {t}", newKnowledge: "new knowledge", note: "Note",
@@ -153,7 +153,7 @@ cards: {
       approveInto: "Approve into Brain", checkRead: "Check what I read", notUsable: "Nothing is usable until you approve it.", tooBig: "That file is over 10 MB.",
     },
     common: {
-      netErr: "Can't reach Crewbrain. Check your signal and try again.", close: "Close", thinking: "Thinking", section: "Section",
+      netErr: "Can't reach CrewBrain. Check your signal and try again.", close: "Close", thinking: "Thinking", section: "Section",
       origin: { drive: "From Google Drive", gmail: "From Gmail", photo: "Photo", answer: "Your answer", doc: "Document" },
       lock: {
         internal: "Office only", crew: "Crew", customer: "Homeowners",
@@ -214,7 +214,7 @@ export const ES = {
   home: ["¿Mi refrigerador seguirá funcionando en un apagón?", "¿Cuándo es la inspección?", "¿Podemos añadir otra batería después?"],
   company: "tu contratista",
   owner: {
-    menu: { more: "Más", chat: "Hablar con Crewbrain", helpers: "Mis asistentes", inbox: "Bandeja", brain: "Cerebro", how: "Cómo funciona", switch: "Cambiar de persona (demo)", backChat: "Chat" },
+    menu: { more: "Más", chat: "Hablar con CrewBrain", helpers: "Mis asistentes", inbox: "Bandeja", brain: "Cerebro", how: "Cómo funciona", switch: "Cambiar de persona (demo)", backChat: "Chat" },
     clock: { title: "Reloj de demo", advance: "Adelantar 1 día", reset: "Reiniciar reloj", off: "El reloj de demo está apagado en este servidor.", now: "Ahora: {t}", wasReset: "Reloj reiniciado.", skipped: "Se adelantó 1 día." },
     views: {
       brainTitle: "Cerebro", brainSub: "Todo lo que sabes, con un candado en cada página.",
@@ -223,7 +223,7 @@ export const ES = {
     },
     create: {
       title: "¿Qué necesitas?",
-      intro: "Toca el micrófono amarillo y dilo como se lo dirías a tu encargado de oficina. Crea un asistente, enséñale algo a Crewbrain o pregunta qué hay de nuevo. O toca una de estas:",
+      intro: "Toca el micrófono amarillo y dilo como se lo dirías a tu encargado de oficina. Crea un asistente, enséñale algo a CrewBrain o pregunta qué hay de nuevo. O toca una de estas:",
       trySaying: "Prueba a decir",
       suggestions: [
         "Crea un asistente para los Patel sobre su instalación, hasta 30 días después de la entrega",
@@ -261,7 +261,7 @@ export const ES = {
     },
     pill: { live: "Activo", waiting: "Esperando tu aprobación", ended: "Terminado" },
     brainTab: {
-      snap: "Enseñar con una foto", empty: "Aún no hay nada. Toma una foto de una tarjeta de garantía o una nota de obra para enseñarle a Crewbrain.",
+      snap: "Enseñar con una foto", empty: "Aún no hay nada. Toma una foto de una tarjeta de garantía o una nota de obra para enseñarle a CrewBrain.",
       updated: "Actualizado {d}", updatedWord: "actualizado", saveWho: "Guardar quién puede verlo", nowVisible: "Ahora visible para: {l}", version: "Versión {v}",
       whoSee: "Quién puede verlo", yourPhoto: "Tu foto", reading: "Leyendo tu foto…", saveBrain: "Guardar en mi Cerebro", saving: "Guardando…",
       added: "Añadido: {t}", newKnowledge: "conocimiento nuevo", checkTitle: "Revisa lo que leí",
@@ -283,11 +283,11 @@ export const ES = {
     ob: {
       skip: "Saltar", step: "{i} de {n}", start: "Empezar", next: "Siguiente",
       s1Title: "El cerebro de tu empresa", s1Text: "Todo lo que sabes de tus trabajos, en un solo lugar. Cada página tiene un candado, así que tú decides quién la ve: solo la oficina, tu equipo o la familia.",
-      s2Title: "Di quién necesita ayuda", s2Text: "Toca el micrófono y habla como se lo dirías a tu encargado de oficina: para quién es, qué trabajo y hasta cuándo. Crewbrain pregunta si falta algo.",
+      s2Title: "Di quién necesita ayuda", s2Text: "Toca el micrófono y habla como se lo dirías a tu encargado de oficina: para quién es, qué trabajo y hasta cuándo. CrewBrain pregunta si falta algo.",
       s3Title: "Tú apruebas, ellos reciben un enlace", s3Text: "Nada se activa sin tu aprobación. Cada persona recibe su propio enlace, y se apaga solo cuando termina el trabajo.",
     },
 cards: {
-      noReach: "No se puede conectar con Crewbrain. Revisa tu señal e inténtalo otra vez.", yourHelper: "tu asistente", sendName: "Enviar {n}",
+      noReach: "No se puede conectar con CrewBrain. Revisa tu señal e inténtalo otra vez.", yourHelper: "tu asistente", sendName: "Enviar {n}",
       copied: "Copiado", holdToCopy: "Mantén pulsado para copiar", copy: "Copiar", text: "SMS", smsBody: "Aquí está tu enlace para {n}: {url}",
       worksUntil: "Funciona hasta {e}", andMore: "y {n} más", noLinks: "Aún no hay enlaces. Primero aprueba el asistente.",
       sendEveryone: "Enviar a todos", showQr: "Mostrar códigos QR",
@@ -318,7 +318,7 @@ cards: {
       title: "El cerebro de tu empresa", intro: "Todo lo que tus asistentes pueden saber. Cada parte tiene un candado que decide quién puede encontrarla.",
       foot: "Guardado en tu cerebro privado de HydraDB. Cada candado decide quién puede encontrarlo.",
       addKnowledge: "Añadir conocimiento", snap: "Tomar una foto", askPh: "Pregúntale a tu cerebro — p. ej. código del portón, garantía", askAria: "Pregúntale a tu cerebro", search: "Buscar",
-      loadFail: "No se pudo cargar el cerebro.", empty: "Aún no hay nada. Toca Añadir conocimiento para enseñarle a Crewbrain.", updated: "Actualizado {d}",
+      loadFail: "No se pudo cargar el cerebro.", empty: "Aún no hay nada. Toca Añadir conocimiento para enseñarle a CrewBrain.", updated: "Actualizado {d}",
       searching: "Buscando…", searchFail: "No se pudo buscar.", noMatch: "Nada en tu cerebro coincide con eso todavía.",
       loading: "Cargando…", textFail: "No se pudo cargar el texto.", whoCanFind: "Quién puede encontrarlo",
       lockFail: "No se pudo cambiar el candado.", locked: "Candado: {l}", added: "Añadido: {t}", newKnowledge: "nuevo conocimiento", note: "Nota",
@@ -335,7 +335,7 @@ cards: {
       approveInto: "Aprobar en el cerebro", checkRead: "Revisa lo que leí", notUsable: "Nada se puede usar hasta que lo apruebes.", tooBig: "Ese archivo pesa más de 10 MB.",
     },
     common: {
-      netErr: "No se puede conectar con Crewbrain. Revisa tu señal e inténtalo otra vez.", close: "Cerrar", thinking: "Pensando", section: "Sección",
+      netErr: "No se puede conectar con CrewBrain. Revisa tu señal e inténtalo otra vez.", close: "Cerrar", thinking: "Pensando", section: "Sección",
       origin: { drive: "De Google Drive", gmail: "De Gmail", photo: "Foto", answer: "Tu respuesta", doc: "Documento" },
       lock: {
         internal: "Solo oficina", crew: "Cuadrilla", customer: "Propietarios",

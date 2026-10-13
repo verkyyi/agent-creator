@@ -55,7 +55,7 @@ const voice = process.env.TTS_VOICE || script.voice || "cedar";
 
 if (test) {
   const f = join(OUT, "test.mp3");
-  await tts({ text: "Crewbrain test. One, two, three.", voice, instructions: script.ttsInstructions, format: "mp3", file: f });
+  await tts({ text: "CrewBrain test. One, two, three.", voice, instructions: script.ttsInstructions, format: "mp3", file: f });
   console.log(`test ok: ${f} ${probeDuration(f).toFixed(2)}s`);
   process.exit(0);
 }

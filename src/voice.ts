@@ -20,7 +20,7 @@ export type Persona = { name?: string; tone?: string };
 export const RELAY_TOOL = {
   type: "function",
   name: "relay",
-  description: "Send what the user said, verbatim, to the Crewbrain backend and get the reply.",
+  description: "Send what the user said, verbatim, to the CrewBrain backend and get the reply.",
   parameters: {
     type: "object",
     properties: {

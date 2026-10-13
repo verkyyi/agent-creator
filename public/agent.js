@@ -109,7 +109,7 @@ async function loadPublic(first) {
 const avKey = () => avatarKey(info?.avatar) || (isCrew ? "hardhat" : "house");
 
 function renderHeader() {
-  document.title = `${info.name} · ${info.tenantName || "Crewbrain"}`;
+  document.title = `${info.name} · ${info.tenantName || "CrewBrain"}`;
   const hk = avKey();
   const hav = $("#h-avatar");
   hav.className = `avatar lg av-${hk}`; hav.dataset.avatar = hk; hav.innerHTML = svgIcon(hk);

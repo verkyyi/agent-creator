@@ -1,4 +1,4 @@
-# Crewbrain API contract (MVP)
+# CrewBrain API contract (MVP)
 
 The server is Hono on Node 22 (`src/server.ts`). It serves `public/` statically and the JSON API under `api/`.
 The app is mounted at BOTH `/` and `/crewbrain/` (Tailscale Funnel publishes it at

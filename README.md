@@ -1,6 +1,6 @@
-# Crewbrain
+# CrewBrain
 
-**Voice AI helpers for contractors' crews and homeowners.** Tell Crewbrain who needs help and it makes a helper for them. Each helper only sees what you allow, answers in their language, gets real work done, and switches off when the job ends.
+**Voice AI helpers for contractors' crews and homeowners.** Tell CrewBrain who needs help and it makes a helper for them. Each helper only sees what you allow, answers in their language, gets real work done, and switches off when the job ends.
 
 | | |
 |---|---|

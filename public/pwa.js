@@ -1,4 +1,4 @@
-/* Crewbrain PWA layer — side-effect only, no imports.
+/* CrewBrain PWA layer — side-effect only, no imports.
  * - registers sw.js (relative, so it works under any sub-path)
  * - offline banner
  * - outbox: chat messages sent while offline are saved and sent when back online
@@ -199,12 +199,12 @@
     return new Response(JSON.stringify({ reply: QUEUED_REPLY, queued: true }), {
       status: 202,
       statusText: "Accepted",
-      headers: { "Content-Type": "application/json", "X-Crewbrain-Queued": "1" },
+      headers: { "Content-Type": "application/json", "X-CrewBrain-Queued": "1" },
     });
   }
   function noteResponse(res, url) {
     if (!url || url.origin !== location.origin || !/\/api\//.test(url.pathname)) return;
-    const flagged = res.headers && res.headers.get("X-Crewbrain-Offline") === "1";
+    const flagged = res.headers && res.headers.get("X-CrewBrain-Offline") === "1";
     if (flagged !== servedFromCache) { servedFromCache = flagged; renderBanner(); }
   }
 
@@ -347,7 +347,7 @@
     deferredPrompt = e;
     if (!installAllowed()) return;
     setTimeout(() => showCard({
-      title: "Add Crewbrain to your home screen",
+      title: "Add CrewBrain to your home screen",
       sub: "Open it like an app. Works even with a weak signal.",
       action: {
         label: "Install",
@@ -372,7 +372,7 @@
       if (!installAllowed()) return;
       lsSet(LS_IOS_SHOWN, "1"); // one-time
       showCard({
-        title: "Add Crewbrain to your home screen",
+        title: "Add CrewBrain to your home screen",
         subHTML: "Tap Share " + SHARE_ICON + ", then <b>Add to Home Screen</b>.",
       });
     }, 3000);

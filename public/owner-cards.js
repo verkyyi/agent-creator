@@ -1,4 +1,4 @@
-// Inline chat cards for the owner's chat with Crewbrain, plus the composer's attach menu.
+// Inline chat cards for the owner's chat with CrewBrain, plus the composer's attach menu.
 import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, showOnSite, scrollToEnd, sourcesToggle } from "./common.js";
 import { ot, fmtWhen } from "./strings.js";
 

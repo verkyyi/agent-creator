@@ -1,7 +1,7 @@
 # Devpost submission: copy/paste
 
 ## Project overview
-**Project name:** Crewbrain
+**Project name:** CrewBrain
 
 **Elevator pitch:** A voice-first company brain for small contractors: talk to it to spin up helpers for homeowners and crews that see only what you allow, take real actions, and switch off when the job ends.
 
@@ -51,10 +51,10 @@ A supervised pilot with trade contractors; real phone sign-in for homeowners and
 **Image gallery:** `video/out/gallery/*.png`
 
 ## Additional info
-- **Team name:** Crewbrain
+- **Team name:** CrewBrain
 - **Team members:** Lianghui Yi, Charlotte He
 - **Team leader email:** verky.yi@gmail.com
-- **Description:** Crewbrain is a voice-first company brain for small contractors. Owners keep their knowledge in HydraDB with a lock on every item, then talk to a creator agent that builds scoped helpers, Juno for homeowners and Rex for crews, that answer only from what they're allowed to see, take actions (log issues with photos, request walkthroughs), escalate what they can't answer, and shut off when the job ends. Claude reasons and cites; gpt-realtime handles voice through the same policy-checked endpoints.
+- **Description:** CrewBrain is a voice-first company brain for small contractors. Owners keep their knowledge in HydraDB with a lock on every item, then talk to a creator agent that builds scoped helpers, Juno for homeowners and Rex for crews, that answer only from what they're allowed to see, take actions (log issues with photos, request walkthroughs), escalate what they can't answer, and shut off when the job ends. Claude reasons and cites; gpt-realtime handles voice through the same policy-checked endpoints.
 - **Did you use HydraDB?** Yes: per-company databases, ACL per source, search-as-audience, ACL updates on close.
 - **Did you use App-Starter?** No
 - **GitHub repo:** https://github.com/verkyyi/agent-creator
