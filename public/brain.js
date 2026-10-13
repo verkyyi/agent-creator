@@ -73,6 +73,11 @@ function injectStyle() {
 .bx-rec { display: grid; place-items: center; gap: .6rem; padding: 1rem 0; }
 .bx-rec .btn { min-width: 160px; min-height: 56px; }
 .bx-timer { font-family: var(--f-mono); font-size: 1.4rem; }
+.bx-drive { border: 1px solid var(--line); border-radius: 10px; padding: .75rem .85rem; background: var(--sheet); margin-bottom: 1rem; display: grid; gap: .4rem; }
+.bx-drive .t { font-weight: 700; display: flex; gap: .5rem; align-items: center; }
+.bx-drive .t svg { width: 20px; height: 20px; }
+.bx-drive p { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.4; }
+.bx-warn { color: var(--ink); background: var(--paper); border-left: 3px solid var(--danger, #c33); padding: .4rem .6rem; border-radius: 6px; font-size: .9rem; }
 `));
 }
 
@@ -90,6 +95,9 @@ export async function renderBrain(el, opts = {}) {
   const q = h("input", { type: "search", id: "ask-input", placeholder: B("askPh"), "aria-label": B("askAria"), enterkeyhint: "search" });
   const results = h("div", { class: "bx-results", "aria-live": "polite" });
   const list = h("div", { class: "bx-list", id: "brain-list" });
+  const drivePanel = h("div", { class: "bx-drive", id: "drive-panel", hidden: true, "aria-live": "polite" });
+  const driveBtn = h("button", { class: "btn ghost", id: "drive-btn", type: "button", html: IC.drive }, B("drive.connect"));
+  let driveState = null, drivePoll = null;
 
   el.innerHTML = "";
   el.append(
@@ -98,8 +106,8 @@ export async function renderBrain(el, opts = {}) {
     h("form", { class: "bx-ask", role: "search", onsubmit: (e) => { e.preventDefault(); ask(); } }, q,
       h("button", { class: "btn", type: "submit", "aria-label": B("search"), html: IC.search })),
     results,
-    h("div", { class: "bx-actions" }, addBtn, snapBtn),
-    photoInput, fileInput, list,
+    h("div", { class: "bx-actions" }, addBtn, snapBtn, driveBtn),
+    drivePanel, photoInput, fileInput, list,
     h("p", { class: "bx-foot" }, B("foot")));
 
   async function load(flashId) {
@@ -150,6 +158,11 @@ export async function renderBrain(el, opts = {}) {
     body.append(h("div", { class: "row-btns", style: "align-items:center" }, h("span", { class: "bx-ic", html: icon, style: "grid-row:auto" }), h("span", { class: "muted" }, words), lockChip(it.sharing, it.lockLabel)));
     if (r.ok) body.append(h("div", { class: "muted", style: "font-size:.85rem" }, r.data.updatedLabel || ""), h("pre", { class: "bx-excerpt", "data-testid": "excerpt" }, r.data.text || ""));
     else body.append(h("p", { class: "muted" }, r.data.error || B("textFail")));
+    if (it.synced === "drive") {
+      if (it.url) body.append(h("a", { href: it.url, target: "_blank", rel: "noopener" }, B("drive.open")));
+      if (it.aclWarning) body.append(h("div", { class: "bx-warn" }, B("drive.fileWarn", { w: it.aclWarning })));
+      body.append(h("p", { class: "muted" }, B("drive.note")));
+    }
     body.append(h("div", { class: "label" }, B("whoCanFind")));
     const row = h("div", { class: "bx-locks" }, LOCK_WORDS.map((l) => h("button", { type: "button", class: "bx-lock", "data-sharing": l.v, "aria-pressed": String(l.v === it.sharing),
       onclick: async (e) => {
@@ -279,6 +292,57 @@ export async function renderBrain(el, opts = {}) {
       h("div", { class: "field" }, h("div", { class: "label" }, B("whoCanFind")), picker.el), approve), { testid: "draft-sheet" });
   }
 
+  // ---------- Google Drive ----------
+  async function loadDrive() {
+    const r = await api("api/drive");
+    if (!r.ok) return;
+    driveState = r.data;
+    renderDrive();
+    const st = driveState.connection?.state;
+    clearTimeout(drivePoll);
+    if (st === "syncing" && el.isConnected) drivePoll = setTimeout(async () => { await loadDrive(); if (driveState?.connection?.state === "active") load(); }, 15000);
+  }
+  function renderDrive() {
+    const d = driveState || {};
+    const c = d.connection;
+    driveBtn.hidden = !!c && c.state !== "error";
+    drivePanel.hidden = !c && d.available !== false;
+    drivePanel.innerHTML = "";
+    if (!c) { if (d.available === false) drivePanel.append(h("p", {}, d.message || B("drive.demo"))); return; }
+    const line = c.state === "picking" ? B("drive.picking") : c.state === "syncing" ? B("drive.syncing", { f: c.folder || "" })
+      : c.state === "active" ? B("drive.active", { f: c.folder || "", n: String(c.files ?? 0) }) : (c.error || B("drive.error"));
+    drivePanel.append(h("div", { class: "t", html: IC.drive }), h("p", {}, line));
+    drivePanel.firstChild.append(B("drive.title"));
+    if (c.aclWarning) drivePanel.append(h("div", { class: "bx-warn" }, B("drive.warn", { w: c.aclWarning })));
+    if (c.state === "picking") drivePanel.append(h("button", { class: "btn yellow", type: "button", onclick: () => folderSheet() }, B("drive.pick")));
+    drivePanel.append(h("p", {}, d.note || B("drive.note")));
+  }
+  async function connectDrive() {
+    if (driveState && driveState.available === false) { toast(driveState.message || B("drive.demo")); renderDrive(); drivePanel.hidden = false; return; }
+    driveBtn.disabled = true;
+    const r = await api("api/drive/connect", {});
+    driveBtn.disabled = false;
+    if (!r.ok) { toast(r.data.reply || r.data.error || B("drive.fail"), "err"); return; }
+    if (r.data.url) { location.href = r.data.url; return; }
+    await loadDrive();
+    if (driveState?.connection?.state === "picking") folderSheet();
+  }
+  function folderSheet() {
+    const folders = driveState?.connection?.folders || [];
+    const body = h("div", { class: "stack bx-sheet" }, h("p", {}, B("drive.pickIntro")), h("p", { class: "muted" }, driveState?.note || B("drive.note")));
+    const listEl = h("div", { class: "bx-locks", "data-testid": "folder-list" });
+    if (!folders.length) listEl.append(h("div", { class: "empty" }, B("drive.noFolders")));
+    for (const f of folders) listEl.append(h("button", { type: "button", class: "bx-lock", "data-folder": f.id, onclick: async (e) => {
+      e.currentTarget.disabled = true;
+      const r = await api("api/drive/folder", { folderId: f.id });
+      if (!r.ok) { e.currentTarget.disabled = false; toast(r.data.reply || r.data.error || B("drive.fail"), "err"); return; }
+      closeSheet(); toast(B("drive.picked", { f: f.name })); driveState = r.data; renderDrive(); loadDrive();
+    } }, h("span", { html: IC.drive, style: "width:22px;height:22px;display:inline-flex" }), h("span", {}, f.name)));
+    body.append(listEl);
+    sheet(B("drive.pick"), body, { testid: "drive-folder-sheet" });
+  }
+  driveBtn.addEventListener("click", connectDrive);
+
   addBtn.addEventListener("click", addSheet);
   snapBtn.addEventListener("click", () => photoInput.click());
   photoInput.addEventListener("change", (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) photoFlow(f); });
@@ -290,5 +354,12 @@ export async function renderBrain(el, opts = {}) {
   });
 
   await load();
+  await loadDrive().catch(() => {});
+  const back = new URLSearchParams(location.search).get("drive");
+  if (back) {
+    history.replaceState(null, "", location.pathname + location.hash);
+    if (back === "pick" && driveState?.connection?.state === "picking") folderSheet();
+    else if (back === "failed") toast(B("drive.fail"), "err");
+  }
   return { reload: load };
 }

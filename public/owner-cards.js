@@ -232,6 +232,25 @@ export function renderCard(c) {
   if (c.type === "confirm") return confirmCard(c);
   if (c.type === "knowledge_draft") return knowledgeDraftCard(c);
   if (c.type === "answer") return answerCard(c);
+  if (c.type === "drive_connect") return driveCard(c);
+}
+
+/** Connect Google Drive: in the demo it only explains; otherwise one tap starts Google sign-in. */
+function driveCard(c) {
+  const body = h("p", { class: "cb-line1" }, c.available ? (c.note || ot("brain.drive.note")) : (c.message || ot("brain.drive.demo")));
+  if (!c.available) return add(card("drive-card", head("check", ot("brain.drive.title")), body));
+  const go = h("button", { class: "btn yellow", type: "button" }, ot("brain.drive.connect"));
+  const foot = h("div", { class: "cb-foot cb-foot-row" }, go);
+  const el = add(card("drive-card", head("check", ot("brain.drive.title")), body, foot));
+  go.onclick = async () => {
+    go.disabled = true;
+    const r = await api("api/drive/connect", {});
+    if (!r.ok) { go.disabled = false; toast(r.data.reply || r.data.error || ot("brain.drive.fail"), "err"); return; }
+    if (r.data.url) { location.href = r.data.url; return; }
+    el.classList.add("done");
+    location.hash = "brain";
+  };
+  return el;
 }
 
 /** Render a card into `target` (e.g. a sheet inside the voice overlay) instead of the chat log. */

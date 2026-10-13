@@ -1,5 +1,5 @@
 import type { Group, Sharing, Source } from "./types.ts";
-import { isDefaultSandbox } from "./store.ts";
+import { db, isDefaultSandbox } from "./store.ts";
 
 // Retrieval runs AS THE AUDIENCE. Each source carries an access list (HydraDB `acl`)
 // derived from its lock; a helper searches with its audience's principals only, so a
@@ -137,6 +137,7 @@ export async function hydraBoot(tenantId: string, sources: Source[]) {
 export async function search(tenantId: string, query: string, sources: Source[], principals: string[], allowedIds: string[]): Promise<{ chunks: Chunk[]; engine: "hydradb" | "local"; requestId?: string }> {
   const allowed = sources.filter((s) => allowedIds.includes(s.id));
   let requestId: string | undefined;
+  const drive = await driveSearch(tenantId, query, allowed, principals);
   if (key() && hydraState[tenantId] === "ready") {
     try {
       const { data: d, requestId: rid } = await hydraEnv("/query", { json: { database: dbName(tenantId), collection: COLLECTION, query, type: "knowledge", query_by: "hybrid", mode: "fast", max_results: 8, graph_context: false, acl: principals } }, 5000);
@@ -156,10 +157,52 @@ export async function search(tenantId: string, query: string, sources: Source[],
           if (!chunks.some((c) => c.sourceId === l.sourceId && c.section === l.section)) chunks.push(l);
         }
       }
+      chunks.push(...drive.filter((d) => !chunks.some((c) => c.sourceId === d.sourceId && c.text === d.text)));
       if (chunks.length) return { chunks: chunks.slice(0, 4), engine: "hydradb", requestId };
     } catch (e) { console.warn("[hydra] query failed, using local", (e as Error).message); }
   }
-  return { chunks: localSearch(query, sources, principals, allowedIds), engine: "local", requestId };
+  const local = localSearch(query, sources, principals, allowedIds);
+  if (drive.length) return { chunks: [...drive, ...local.filter((l) => !drive.some((d) => d.sourceId === l.sourceId))].slice(0, 4), engine: "hydradb", requestId };
+  return { chunks: local, engine: "local", requestId };
+}
+
+// ---------- Google Drive (connector-synced) ----------
+// A sandbox's Drive files live in their own collection (`drive_<sandboxId>`, see drive.ts) of the
+// tenant's database, and are queried only for that sandbox: the connection is stored in the
+// sandbox's own `db.drive`. HydraDB filters by acl (the audience's principals); the app then keeps
+// only chunks whose id is a local Drive record in `sources` (the helper's approved scope) and whose
+// local lock still lets the audience in. `principals` null = the owner's admin view (no acl).
+export async function driveSearch(tenantId: string, query: string, sources: Source[], principals: string[] | null): Promise<Chunk[]> {
+  const conn = db.drive?.[tenantId];
+  if (!key() || conn?.state !== "active") return [];
+  const mine = sources.filter((s) => s.tenantId === tenantId && s.connectorId === conn.connectorId);
+  if (!mine.length) return [];
+  try {
+    const d = await hydra("/query", { json: {
+      database: dbName(tenantId), collection: conn.collection, query, type: "knowledge", query_by: "hybrid", mode: "fast", max_results: 8, graph_context: false,
+      metadata_filters: { additional_metadata: { connector_id: conn.connectorId } }, ...(principals ? { acl: principals } : {}),
+    } }, 5000);
+    const out: Chunk[] = [];
+    for (const c of d?.chunks ?? []) {
+      const src = mine.find((s) => s.id === (c.id ?? c.source_id));
+      if (!src || (principals && !aclAllows(aclFor(src), principals))) continue; // second check
+      const text = String(c.chunk_content ?? "").trim();
+      if (text) out.push({ sourceId: src.id, title: src.title, section: src.title, text, version: src.version, score: c.relevancy_score ?? 0 });
+    }
+    return out;
+  } catch (e) {
+    console.warn("[drive] query failed", (e as Error).message);
+    return [];
+  }
+}
+
+/** A synced Drive file's lock -> its HydraDB acl, replacing the stored list (PATCH /context/{id}/metadata). */
+export async function driveSetAcl(tenantId: string, s: Source) {
+  const conn = db.drive?.[tenantId];
+  if (!key() || !conn || s.connectorId !== conn.connectorId) return;
+  try {
+    await hydra(`/context/${encodeURIComponent(s.id)}/metadata`, { method: "PATCH", json: { database: dbName(tenantId), collection: conn.collection, acl: aclFor(s) } });
+  } catch (e) { console.warn("[drive] acl update failed", (e as Error).message); }
 }
 
 // ---------- feedback loop ----------

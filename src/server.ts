@@ -10,6 +10,7 @@ import * as core from "./core.ts";
 import { voiceRoutes } from "./voice.ts";
 import { prewarm } from "./llm.ts";
 import { brainRoutes } from "./brain.ts";
+import { driveRoutes, oauthRoutes } from "./drive.ts";
 import type { Member } from "./types.ts";
 import { accessLog } from "./access.ts";
 import { llmConfigured } from "./llm.ts";
@@ -203,6 +204,7 @@ export function buildApp() {
     return { ok: true };
   }));
 
+  app.route("/api/drive", driveRoutes);
   app.route("/api/voice", voiceRoutes);
   app.route("/api/x", brainRoutes);
   app.route("/api", brainRoutes);
@@ -214,6 +216,7 @@ export function buildApp() {
     if (!smsSimulator() || m?.role !== "owner") return c.text("Not found", 404);
     return next();
   });
+  app.route("/", oauthRoutes); // Google OAuth callback (state bound to session + sandbox)
   app.use("/*", serveStatic({ root: "./public" }));
   app.get("/", serveStatic({ path: "./public/index.html" }));
 
