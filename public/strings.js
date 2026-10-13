@@ -135,6 +135,16 @@ cards: {
     brain: {
       title: "Your company brain", intro: "Everything your helpers can know. Each piece has a lock that decides who can find it.",
       foot: "Stored in your private HydraDB brain. Each lock decides who can find it.",
+      drive: {
+        connect: "Connect Google Drive", title: "Google Drive", demo: "Available in your own CrewBrain workspace",
+        picking: "Connected. Pick the one folder CrewBrain should read.", pick: "Pick a Drive folder",
+        pickIntro: "CrewBrain reads only this folder, and keeps it in sync.", noFolders: "No folders found in this Drive.",
+        syncing: "Reading “{f}”… new files show up here in a few minutes.", active: "Syncing “{f}”: {n} files. Each starts as Office only.",
+        error: "Drive stopped syncing. Connect it again.", fail: "Couldn't connect Google Drive. Try again.", picked: "Reading “{f}”",
+        note: "Files shared with anyone or with a customer in Drive keep that sharing. Everything else in the folder starts as Office only: no helper uses a file until you relabel it.",
+        warn: "Heads up: Drive's sharing couldn't be read for this folder ({w}). Until it can, the folder's Office-only rule applies.",
+        fileWarn: "Heads up: Drive's sharing couldn't be read for this file ({w}).", open: "Open in Google Drive",
+      },
       addKnowledge: "Add knowledge", snap: "Snap a photo", askPh: "Ask your brain — e.g. gate code, warranty", askAria: "Ask your brain", search: "Search",
       loadFail: "Couldn't load the brain.", empty: "Nothing here yet. Tap Add knowledge to teach CrewBrain.", updated: "Updated {d}",
       searching: "Searching…", searchFail: "Couldn't search.", noMatch: "Nothing in your brain matches that yet.",
@@ -317,6 +327,16 @@ cards: {
     brain: {
       title: "El cerebro de tu empresa", intro: "Todo lo que tus asistentes pueden saber. Cada parte tiene un candado que decide quién puede encontrarla.",
       foot: "Guardado en tu cerebro privado de HydraDB. Cada candado decide quién puede encontrarlo.",
+      drive: {
+        connect: "Conectar Google Drive", title: "Google Drive", demo: "Disponible en tu propio espacio de CrewBrain",
+        picking: "Conectado. Elige la carpeta que CrewBrain debe leer.", pick: "Elegir una carpeta de Drive",
+        pickIntro: "CrewBrain lee solo esta carpeta y la mantiene al día.", noFolders: "No hay carpetas en este Drive.",
+        syncing: "Leyendo “{f}”… los archivos nuevos aparecen aquí en unos minutos.", active: "Sincronizando “{f}”: {n} archivos. Cada uno empieza como Solo oficina.",
+        error: "Drive dejó de sincronizar. Conéctalo de nuevo.", fail: "No se pudo conectar Google Drive. Inténtalo de nuevo.", picked: "Leyendo “{f}”",
+        note: "Los archivos compartidos con cualquiera o con un cliente en Drive conservan ese permiso. Todo lo demás en la carpeta empieza como Solo oficina: ningún asistente usa un archivo hasta que cambies su candado.",
+        warn: "Atención: no se pudo leer cómo se comparte esta carpeta en Drive ({w}). Mientras tanto se aplica la regla Solo oficina de la carpeta.",
+        fileWarn: "Atención: no se pudo leer cómo se comparte este archivo en Drive ({w}).", open: "Abrir en Google Drive",
+      },
       addKnowledge: "Añadir conocimiento", snap: "Tomar una foto", askPh: "Pregúntale a tu cerebro — p. ej. código del portón, garantía", askAria: "Pregúntale a tu cerebro", search: "Buscar",
       loadFail: "No se pudo cargar el cerebro.", empty: "Aún no hay nada. Toca Añadir conocimiento para enseñarle a CrewBrain.", updated: "Actualizado {d}",
       searching: "Buscando…", searchFail: "No se pudo buscar.", noMatch: "Nada en tu cerebro coincide con eso todavía.",

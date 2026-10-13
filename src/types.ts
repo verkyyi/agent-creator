@@ -23,6 +23,8 @@ export interface Member {
   // Owner-only: which sources/tools this member may authorize for an agent.
   sourceScope: string[];
   toolScope: string[];
+  /** Owner-only: may connect real external data (Google Drive). Never set in the public demo seed. */
+  realConnectors?: boolean;
 }
 
 export interface Group {
@@ -45,6 +47,25 @@ export interface Source {
   jobId?: string;
   updatedAt?: string;
   sections: { heading: string; text: string }[];
+  /** Synced by a HydraDB connector (Google Drive): a local record only; the text lives in HydraDB. */
+  connectorId?: string;
+  driveUrl?: string;
+  /** HydraDB couldn't read this file's Drive permissions (shown to the owner as is). */
+  aclWarning?: string;
+}
+
+/** One Google Drive connection per tenant, inside one sandbox (see drive.ts). */
+export interface DriveConn {
+  connectorId: string;
+  collection: string; // drive_<sandboxId>
+  state: "picking" | "syncing" | "active" | "error";
+  folders: { id: string; name: string; resource_type: string }[];
+  folder?: { id: string; name: string; resource_type: string };
+  aclWarning?: string;
+  error?: string;
+  connectedBy: string;
+  connectedAt: string;
+  checkedAt?: string;
 }
 
 export interface ToolDef {
@@ -177,6 +198,8 @@ export interface DB {
   inviteTokens?: Record<string, string>;
   // tool fixture data, keyed by tenant
   toolData: Record<string, Record<string, unknown>>;
+  // Google Drive connections, keyed by tenant (this sandbox only)
+  drive?: Record<string, DriveConn>;
 }
 
 export interface Cite { title: string; section: string; version: number }

@@ -104,13 +104,13 @@ export function seed(): DB {
     templates: [
       {
         id: "homeowner_helper", purpose: "Explain the install, the battery and the warranty to a household.",
-        sourceCategories: ["product_guide", "warranty", "job_record"], audienceKind: "household", allowedSharing: ["customer"],
+        sourceCategories: ["product_guide", "warranty", "job_record", "drive_file"], audienceKind: "household", allowedSharing: ["customer"],
         tools: ["job.status", "action.request_walkthrough"],
         defaults: { name: "Juno", avatar: "house", tone: "warm and plain-spoken", expiryHint: "30 days after handover" },
       },
       {
         id: "crew_briefing", purpose: "Brief a crew on site access, scope and safety for one job.",
-        sourceCategories: ["site_brief", "safety", "job_record", "product_guide"], audienceKind: "crew", allowedSharing: ["customer", "crew"],
+        sourceCategories: ["site_brief", "safety", "job_record", "product_guide", "drive_file"], audienceKind: "crew", allowedSharing: ["customer", "crew"],
         tools: ["crew.schedule", "action.log_issue", "action.notify_homeowner"],
         defaults: { name: "Rex", avatar: "hardhat", tone: "direct and practical", expiryHint: "when the job closes" },
       },

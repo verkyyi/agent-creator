@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { db, id, now, record, save, isDefaultSandbox } from "./store.ts";
-import { aclFor, graphQuery, hydraIngest, localSearch, principalsFor, sharingFromLabel, type Related } from "./retrieval.ts";
+import { aclFor, driveSearch, graphQuery, hydraIngest, localSearch, principalsFor, sharingFromLabel, type Related } from "./retrieval.ts";
 import * as core from "./core.ts";
 import { dbName, hydraCall, hydraOn } from "./memory.ts";
 import type { Member, Sharing, Source } from "./types.ts";
@@ -191,6 +191,11 @@ export async function ask(owner: Member, q: string) {
       push(s, sec?.heading ?? s.sections[0]?.heading ?? "", sec?.text ?? (isDefaultSandbox() ? String(ch.chunk_content ?? "") : s.sections[0]?.text ?? ""));
     }
     related = g.related;
+  }
+  // Synced Google Drive files: this sandbox's own collection, owner view (no acl).
+  for (const ch of await driveSearch(owner.tenantId, query, scoped, null)) {
+    const s = scoped.find((x) => x.id === ch.sourceId);
+    if (s) push(s, ch.section, ch.text);
   }
   // Local index over every lock. Titles count too ("price book" finds "Price Book 2026").
   const principals = [...new Set(mine.flatMap((s) => aclFor(s)))];

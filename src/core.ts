@@ -2,7 +2,8 @@ import { raceAnswer } from "./fastllm.ts";
 import { z } from "zod";
 import { db, now, record, id, hashConfig, save, inviteToken, isDefaultSandbox, currentSandbox, inSandbox } from "./store.ts";
 import { creatorEngine, type ToolSpec, type Turn } from "./creator.ts";
-import { aclFor, graphQuery, hydraFeedback, hydraIngest, hydraReady, hydraSetAcl, localSearch, principalsFor, search } from "./retrieval.ts";
+import { view as driveView } from "./drive.ts";
+import { aclFor, graphQuery, hydraFeedback, hydraIngest, hydraReady, hydraSetAcl, driveSetAcl, localSearch, principalsFor, search } from "./retrieval.ts";
 import { claude, llmStatus } from "./llm.ts";
 import { remember, recall, forgetAgent } from "./memory.ts";
 import { ask as askBrain } from "./brain.ts";
@@ -394,6 +395,11 @@ function creatorTools(owner: Member, base: string, sink: Sink): ToolSpec[] {
       const hs = mineOf(owner).map(summary);
       sink.cards.push({ type: "helpers", helpers: hs });
       return { ok: true, helpers: hs.map((h) => ({ name: h.name, state: h.state, ends: h.endsLabel, audience: h.audienceName })) };
+    }),
+    t("connect_drive", "Show a card that connects the owner's Google Drive folder to the company brain. Does NOT connect it: the owner taps the card and signs in with Google. New Drive files start as Office only.", {}, () => {
+      const v = driveView(owner);
+      sink.cards.push({ type: "drive_connect", available: v.available, message: v.message, note: v.note, ...(v.connection ? { connection: v.connection } : {}) });
+      return v.available ? { ok: true, card: "on screen", note: v.note } : { ok: false, unavailable: v.message };
     }),
     t("whats_new", "What the helpers heard: open questions, issues, walkthrough requests and crew updates waiting for the owner.", {}, () => {
       const n = whatsNew(owner);
@@ -842,7 +848,8 @@ export function history(m: Member, agentId: string) {
 // ---------- brain ----------
 const LOCK = (s: Source) => s.sharing === "internal" ? "Office only" : s.sharing === "crew" ? (s.jobId ? "Crew · 42 Oak St" : "All crews") : (s.jobId ? "Homeowners · 42 Oak St" : "Homeowners");
 export function brainItem(s: Source) {
-  return { id: s.id, title: s.title, version: s.version, origin: s.origin, category: s.category, sharing: s.sharing, lockLabel: LOCK(s), jobId: s.jobId, updatedAt: s.updatedAt ?? "2026-10-10T16:00:00.000Z", note: s.sharing === "internal" ? "never reaches a helper" : undefined };
+  return { id: s.id, title: s.title, version: s.version, origin: s.origin, category: s.category, sharing: s.sharing, lockLabel: LOCK(s), jobId: s.jobId, updatedAt: s.updatedAt ?? "2026-10-10T16:00:00.000Z", note: s.sharing === "internal" ? "never reaches a helper" : undefined,
+    ...(s.connectorId ? { synced: "drive", ...(s.driveUrl ? { url: s.driveUrl } : {}), ...(s.aclWarning ? { aclWarning: s.aclWarning } : {}) } : {}) };
 }
 export function brain(owner: Member) {
   if (owner.role !== "owner") throw new HttpError(403, { error: "forbidden" });
@@ -854,7 +861,8 @@ export function relabel(owner: Member, sid: string, sharing: Sharing) {
   if (!s) throw new HttpError(404, { error: "not_found" });
   s.sharing = sharing;
   s.updatedAt = now().toISOString();
-  if (isDefaultSandbox()) void hydraSetAcl(owner.tenantId, s); // shared index: see closeAgent
+  if (s.connectorId) void driveSetAcl(owner.tenantId, s); // this sandbox's own Drive collection
+  else if (isDefaultSandbox()) void hydraSetAcl(owner.tenantId, s); // shared index: see closeAgent
   record({ tenantId: owner.tenantId, actorId: owner.id, kind: "source.relabel", detail: { id: sid, sharing, acl: aclFor(s) } });
   save();
   return { item: brainItem(s) };
