@@ -10,15 +10,17 @@ import * as core from "./core.ts";
 import { voiceRoutes } from "./voice.ts";
 import { brainRoutes } from "./brain.ts";
 import type { Member } from "./types.ts";
+import { accessLog } from "./access.ts";
+import { llmConfigured } from "./llm.ts";
 
 type Env = { Variables: { member: Member } };
 
 // Identity is bound on the server: tenant and member come from the session, never the body.
-function sessionMember(c: Context): Member | undefined {
-  const tok = getCookie(c, "cb_session");
+function memberForToken(tok: string | undefined): Member | undefined {
   const s = tok ? db.sessions.find((x) => x.token === tok) : undefined;
   return s ? core.memberById(s.memberId) : undefined;
 }
+const sessionMember = (c: Context) => memberForToken(getCookie(c, "cb_session"));
 
 function base(c: Context) {
   if (process.env.PUBLIC_BASE) return process.env.PUBLIC_BASE;
@@ -66,7 +68,7 @@ export function buildApp() {
     return c.json({ identities: Object.entries(DEMO_TOKENS).map(([mid, t]) => ({ name: core.memberById(mid)!.name, role: core.memberById(mid)!.role, description: desc[mid], url: `${base(c)}i/${t}` })) });
   });
 
-  app.get("/api/health", (c) => c.json({ ok: true, now: now().toISOString(), hydra: hydraState, claude: !!(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY), voice: !!process.env.OPENAI_API_KEY }));
+  app.get("/api/health", (c) => c.json({ ok: true, now: now().toISOString(), hydra: hydraState, claude: llmConfigured(), voice: !!process.env.OPENAI_API_KEY }));
 
   app.use("/api/*", async (c, next) => {
     if (c.req.path.endsWith("/api/demo/identities") || c.req.path.endsWith("/api/health")) return next();
@@ -136,6 +138,7 @@ export function buildApp() {
   app.get("/", serveStatic({ path: "./public/index.html" }));
 
   const root = new Hono<Env>();
+  root.use("*", accessLog(memberForToken));
   root.route("/crewbrain", app);
   root.route("/", app);
   return root;

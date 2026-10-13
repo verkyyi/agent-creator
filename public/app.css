@@ -142,6 +142,7 @@ main { flex: 1; min-height: 0; position: relative; display: flex; flex-direction
 .msg .photo { display: block; max-width: 220px; border-radius: 10px; margin-bottom: .4rem; }
 .cites { display: grid; gap: 2px; margin-top: .45rem; white-space: normal; }
 .cites { gap: .35rem; }
+.msg .notice { margin-top: .45rem; font-size: .8em; opacity: .75; white-space: normal; }
 .cite { display: inline-flex; align-items: center; gap: .4rem; justify-self: start; max-width: 100%; min-height: 36px; padding: .3rem .7rem .3rem .5rem; border-radius: 999px; border: 1px solid #34404f; background: rgba(255,255,255,.04); color: #c3cfdc; font-size: .85rem; line-height: 1.25; text-align: left; cursor: pointer; }
 .cite span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cite .ico-i svg { width: 16px; height: 16px; }

@@ -148,6 +148,7 @@ function helperMessage(m) {
     refused ? h("div", { class: "who-line" }, icon("lock"), t().notShare) : null,
     m.reply ?? m.text ?? "");
   if (m.citations?.length) el.append(h("div", { class: "cites" }, m.citations.map((c) => citeChip(c, id, { prefix: t().source, loading: t().loading }))));
+  if (m.notice) el.append(h("div", { class: "notice" }, lang === "es" ? "El asistente de IA no está disponible ahora; esta respuesta viene tal cual de las notas de la empresa." : m.notice));
   chat.append(el);
   if (m.action?.kind === "owner_answer") {
     const owner = firstName(info?.ownerName) || (lang === "es" ? "El dueño" : "The owner");

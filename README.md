@@ -49,11 +49,18 @@ phone (PWA, voice) ─▶ server: identity → audience → lifecycle → tool g
 ## Run it
 
 ```sh
-npm ci
-security add-generic-password -a crewbrain -s HYDRA_DB_API_KEY -w <key>   # also OPENAI_API_KEY, CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
+npm ci --include=optional   # the Agent SDK's native Claude binary is an optional per-platform package; postinstall fails without it
+security add-generic-password -a crewbrain -s HYDRA_DB_API_KEY -w <key>   # also OPENAI_API_KEY; CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY only without the fleet
 ./scripts/start.sh          # http://127.0.0.1:8787/demo.html
 ./scripts/deploy.sh         # test-gated deploy to the mini
+scripts/visits.sh [days]    # daily requests, unique IPs, page views, members, referers
 ```
+
+**Claude auth.** When the login runs claude-fleet (`~/.claude/fleet`, a tenant of the shared credential proxy), every Claude call mints a one-turn session credential with `fleet-session-cred.sh mint`, runs the SDK through the loopback proxy, and revokes it afterwards; the credential never reaches a log, a response or a file (override the script path with `FLEET_SESSION_CRED`). Without the fleet it uses `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY`. Models are limited to Sonnet 5.5 (default) and Haiku 5.5. If Claude can't be reached, helpers answer from the notes and say so in plain words.
+
+**Access log.** `logs/access.log` (override with `ACCESS_LOG_DIR`), one JSON line per request: time, method, path, status, ms, client IP (`X-Forwarded-For` from Funnel), User-Agent, Referer, tenant/member. Never cookies, tokens, query strings or bodies; invite tokens in paths are masked. Rolled daily and at 10 MB, kept 30 days.
+
+**Deploy on the mini by hand** (as the service's user): `git pull && npm ci --include=optional && launchctl kickstart -k gui/$(id -u)/com.verkyyi.crewbrain`.
 
 Without keys it runs in offline mode (local search, extractive answers, no voice).
 
