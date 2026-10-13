@@ -29,8 +29,64 @@ let queryImpl: Query | null = null;
 export function setQuery(q: Query | null) { queryImpl = q; }
 const enabled = () => llmConfigured() && (process.env.NODE_ENV !== "test" || !!queryImpl);
 
+
+// Warm sessions: starting the SDK's Claude process is most of a reply's latency (~5 s),
+// so a few sessions are started ahead of time, each waiting for exactly ONE message.
+// A session is used once and discarded, so nothing carries over between visitors. The
+// per-request instructions travel inside that message; the session's own system prompt
+// is a fixed, generic one.
+const WARM_SYSTEM = "Follow the instructions given at the top of the user's message exactly. They define your role, rules and output format.";
+type Warm = { send: (text: string) => void; result: Promise<string | null>; born: number };
+const pools = new Map<string, Warm[]>();
+const POOL_SIZE = Number(process.env.CLAUDE_WARM ?? 2);
+const WARM_TTL_MS = 10 * 60_000;
+
+function spawnWarm(model: string): Warm {
+  let release!: (t: string) => void;
+  const msg = new Promise<string>((r) => (release = r));
+  const input = (async function* () {
+    const text = await msg;
+    yield { type: "user", message: { role: "user", content: text }, parent_tool_use_id: null, session_id: "" } as any;
+  })();
+  const result = (async () => {
+    const q: Query = queryImpl ?? ((await import("@anthropic-ai/claude-agent-sdk")).query as unknown as Query);
+    let out: string | null = null;
+    for await (const m of q({ prompt: input, options: { model, maxTurns: 1, allowedTools: [], systemPrompt: WARM_SYSTEM, settingSources: [] } })) {
+      if (m?.type !== "result") continue;
+      if (m.is_error || m.subtype !== "success") { console.warn("[claude] failed:", redact(m.result ?? m.subtype)); out = null; }
+      else out = m.result ?? null;
+      break;
+    }
+    return out?.trim() || null;
+  })().catch((e) => { console.warn("[claude] warm failed:", redact((e as Error).message)); return null; });
+  return { send: release, result, born: Date.now() };
+}
+
+function takeWarm(model: string): Warm | undefined {
+  if (!(process.env.NODE_ENV !== "test" && llmConfigured() && POOL_SIZE > 0)) return undefined;
+  const pool = pools.get(model) ?? [];
+  pools.set(model, pool);
+  let w: Warm | undefined;
+  while ((w = pool.shift()) && Date.now() - w.born > WARM_TTL_MS) w.send("Reply with: ok"); // let stale ones finish and exit
+  while (pool.length < POOL_SIZE) pool.push(spawnWarm(model));
+  return w;
+}
+export function prewarm() {
+  if (!(process.env.NODE_ENV !== "test" && llmConfigured() && POOL_SIZE > 0)) return;
+  for (const m of MODELS) { const pool = pools.get(m) ?? []; pools.set(m, pool); while (pool.length < POOL_SIZE) pool.push(spawnWarm(m)); }
+}
+
 export async function claude(system: string, prompt: string, opts: { model?: string; timeoutMs?: number; images?: string[] } = {}): Promise<string | null> {
   if (!enabled()) { if (process.env.NODE_ENV !== "test") mark(false); return null; }
+  if (!opts.images?.length) {
+    const w = takeWarm(pickModel(opts.model ?? process.env.CLAUDE_MODEL));
+    if (w) {
+      w.send(`<instructions>\n${system}\n</instructions>\n\n${prompt}`);
+      const out = await Promise.race([w.result, new Promise<null>((r) => setTimeout(() => r(null), opts.timeoutMs ?? 20000))]);
+      mark(!!out);
+      return out;
+    }
+  }
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), opts.timeoutMs ?? 20000);
   try {

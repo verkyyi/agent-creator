@@ -8,6 +8,7 @@ import { db, now, record, reset, save, createSandbox, getSandbox, inSandbox, inv
 import { hydraBoot, hydraIngest, hydraState, sharingFromLabel } from "./retrieval.ts";
 import * as core from "./core.ts";
 import { voiceRoutes } from "./voice.ts";
+import { prewarm } from "./llm.ts";
 import { brainRoutes } from "./brain.ts";
 import type { Member } from "./types.ts";
 import { accessLog } from "./access.ts";
@@ -196,6 +197,7 @@ if (process.env.NODE_ENV !== "test") {
   const port = Number(process.env.PORT ?? 8787);
   serve({ fetch: buildApp().fetch, port, hostname: "127.0.0.1" }, () => console.log(`crewbrain on http://127.0.0.1:${port}/`));
   for (const t of db.tenants) void hydraBoot(t.id, db.sources.filter((s) => s.tenantId === t.id));
+  prewarm();
   archiveLegacyFile();
   gc();
   setInterval(() => gc(), 60 * 60 * 1000).unref();
