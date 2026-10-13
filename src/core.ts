@@ -7,6 +7,7 @@ import { claude, llmStatus } from "./llm.ts";
 import { remember, recall, forgetAgent } from "./memory.ts";
 import { ask as askBrain } from "./brain.ts";
 import { localize } from "./i18n.ts";
+import { indexPhone, isFictional, normalizePhone, notifyMember, smsAvailable } from "./sms.ts";
 import type { Agent, AgentConfig, Member, Revision, Source, Template, Group, Cite, Sharing, InboxRec } from "./types.ts";
 
 export class HttpError extends Error {
@@ -217,6 +218,64 @@ function closeCard(a: Agent) {
     request: { method: "POST", path: `api/agents/${a.id}/close` },
   };
 }
+function findMember(owner: Member, who: string) {
+  const t = who.trim().toLowerCase();
+  const all = db.members.filter((m) => m.tenantId === owner.tenantId);
+  return all.find((m) => m.id === t) ?? all.find((m) => m.name.toLowerCase() === t) ?? all.find((m) => m.name.toLowerCase().split(/[\s(]+/)[0] === t.split(/\s+/)[0]);
+}
+function phoneCard(m: Member, phone: string) {
+  return {
+    type: "confirm", title: phone ? `Text ${m.name.split(" ")[0]} at ${phone}` : `Remove ${m.name.split(" ")[0]}'s number`, confirmLabel: phone ? "Save number" : "Remove number",
+    body: phone ? `${m.name} can text their helper from this number${smsAvailable() ? " and gets answers and updates by text" : ""}.` : `${m.name} won't be able to text a helper.`,
+    request: { method: "POST", path: `api/members/${m.id}/phone`, body: { phone } },
+  };
+}
+/** The owner's tap on a phone card. An empty phone clears it. */
+export function setPhone(owner: Member, memberId: string, raw: unknown) {
+  if (owner.role !== "owner") throw new HttpError(403, { error: "forbidden" });
+  const m = memberById(memberId);
+  if (!m || m.tenantId !== owner.tenantId) throw new HttpError(404, { error: "not_found" });
+  const phone = typeof raw === "string" && !raw.trim() ? "" : normalizePhone(raw);
+  if (phone === undefined) throw new HttpError(400, { error: "bad_phone", reply: "That isn't a phone number I can use. Include the area code." });
+  if (phone && db.members.some((x) => x.id !== m.id && x.phone === phone)) throw new HttpError(409, { error: "phone_taken", reply: "Someone else already has that number." });
+  if (phone) { m.phone = phone; indexPhone(phone, m.id); } else delete m.phone;
+  delete m.smsAgentId;
+  record({ tenantId: owner.tenantId, actorId: owner.id, kind: "member.phone", detail: { member: m.id, set: !!phone, fictional: phone ? isFictional(phone) : undefined } });
+  save();
+  const first = m.name.split(" ")[0];
+  return { member: { id: m.id, name: m.name, phone: m.phone ?? null }, reply: phone ? `Saved. ${first} can text their helper from ${phone}.` : `Removed ${first}'s number.` };
+}
+
+/** "Text from CrewBrain number": the helper's invitation by SMS to everyone (or one person) in its audience with a phone. */
+export function smsInvite(owner: Member, agentId: string, base: string, memberId?: string) {
+  const a = ownAgent(owner, agentId);
+  if (lifecycle(a) !== "active") throw new HttpError(409, { error: "not_live", reply: "This helper isn't live." });
+  if (!smsAvailable()) throw new HttpError(409, { error: "sms_off", reply: "Texting isn't set up." });
+  const c = cfgOf(a);
+  const tenant = tenantOf(a.tenantId);
+  const sent: string[] = [], skipped: string[] = [];
+  for (const l of links(owner, a.id, base).links) {
+    if (memberId && l.memberId !== memberId) continue;
+    const m = memberById(l.memberId)!;
+    if (!m.phone) { skipped.push(m.name); continue; }
+    indexPhone(m.phone, m.id);
+    notifyMember(m, `${tenant.name}: ${c.name} is your helper (${c.job.replace(/[.]$/, "")}). Text your questions to this number, or open ${l.url}`, "invite");
+    sent.push(m.name);
+  }
+  record({ tenantId: owner.tenantId, actorId: owner.id, agentId: a.id, kind: "sms.invite", detail: { count: sent.length } });
+  save();
+  const reply = sent.length ? `Texted ${sent.map((n) => n.split(" ")[0]).join(" and ")}.${skipped.length ? ` No number for ${skipped.join(", ")}.` : ""}` : "Nobody here has a phone number yet.";
+  return { sent, skipped, reply };
+}
+
+/** Helpers a member can reach by text: newest first (by when the live version was approved). */
+export function textableHelpers(m: Member) {
+  return db.agents.filter((a) => a.tenantId === m.tenantId && (m.role === "owner" ? a.ownerId === m.id : !!active(a) && !!groupById(active(a)!.config.audienceGroupId)?.memberIds.includes(m.id)))
+    .map((a, i) => ({ a, i, at: active(a)?.approvedAt ?? "" }))
+    .sort((x, y) => (y.at.localeCompare(x.at)) || y.i - x.i)
+    .map(({ a }) => ({ id: a.id, name: cfgOf(a).name, state: lifecycle(a) }));
+}
+
 function lockCard(s: Source, lockTo: Sharing) {
   const label = lockLabelOf(lockTo);
   return {
@@ -269,6 +328,7 @@ function creatorContext(owner: Member) {
     audiences: db.groups.filter((g) => g.tenantId === owner.tenantId).map((g) => ({ audience_group_id: g.id, name: g.name, kind: g.kind, members: g.memberIds.length, job: g.jobId, helperKind: g.kind === "crew" ? "crew_briefing" : "homeowner_helper" })),
     helperKinds: db.templates.map((t) => ({ kind: t.id, for: t.audienceKind, purpose: t.purpose, defaultName: t.defaults.name, defaultTone: t.defaults.tone, typicalEnd: t.defaults.expiryHint })),
     jobs,
+    people: db.members.filter((m) => m.tenantId === owner.tenantId && m.id !== owner.id).map((m) => ({ id: m.id, name: m.name, audiences: db.groups.filter((g) => g.memberIds.includes(m.id)).map((g) => g.name), phone: m.phone ?? null })),
     helpers: mineOf(owner).map((a) => { const s = summary(a); const c = cfgOf(a); return { id: s.id, name: s.name, kind: a.templateId, state: s.state, audience: s.audienceName, ends: s.endsLabel, pendingRev: s.pendingRev, tone: c.tone, tools: c.tools.map((t) => db.tools.find((x) => x.id === t)?.name ?? t) }; }),
     knowledge: db.sources.filter((s) => s.tenantId === owner.tenantId).map((s) => ({ id: s.id, title: s.title, lock: s.sharing, lockLabel: brainItem(s).lockLabel })),
     openInbox: openInbox(owner).map((i) => ({ inbox_id: i.id, kind: i.kind, from: memberById(i.fromId)?.name ?? "", helper: helperNameOf(i.agentId), text: i.text })),
@@ -421,6 +481,17 @@ function creatorTools(owner: Member, base: string, sink: Sink): ToolSpec[] {
       const r = await brainLookup(owner, a.question);
       if (r.results.length) sink.cards.push({ type: "answer", results: r.results, ...(r.related.length ? { related: r.related } : {}) });
       return r.results.length ? r : { results: [], note: "Nothing found. Offer to remember it (remember_note)." };
+    }),
+    t("set_phone", "Put a confirm card on screen to save (or clear, with an empty phone) a person's mobile number so they can text their helper and get texts. Does NOT save it: only the owner's tap does.", {
+      member: z.string().describe("Person's name or id, from the audiences"), phone: z.string().max(30).describe("Mobile number, e.g. +1 415 555 0142; empty to remove"),
+    }, (a) => {
+      const m = findMember(owner, a.member);
+      if (!m) return { error: `no person called "${a.member}" in your company` };
+      const phone = a.phone.trim() ? normalizePhone(a.phone) : "";
+      if (phone === undefined) return { error: `"${a.phone}" isn't a phone number I can use. Ask for the full number with area code.` };
+      sink.cards.push(phoneCard(m, phone));
+      sink.fallback ??= phone ? `Save ${phone} for ${m.name}? Tap to confirm.` : `Remove ${m.name}'s number? Tap to confirm.`;
+      return { ok: true, shownToOwner: "confirm card", saved: false, member: m.name, phone };
     }),
     t("job_status", "Status of a job: its notes, open helper items and linked documents.", { job: z.string().describe("Job id or address words, e.g. 'Oak St'") }, async (a) => {
       const job = jobFromText(owner.tenantId, a.job);
@@ -621,7 +692,8 @@ export function approve(owner: Member, agentId: string, rev: number, base: strin
 export function links(owner: Member, agentId: string, base: string) {
   const a = ownAgent(owner, agentId);
   const g = groupById(cfgOf(a).audienceGroupId)!;
-  return { links: g.memberIds.map((mid) => ({ memberId: mid, name: memberById(mid)!.name, url: `${base}i/${inviteToken(mid)}?a=${a.id}` })) };
+  const sms = smsAvailable();
+  return { links: g.memberIds.map((mid) => ({ memberId: mid, name: memberById(mid)!.name, url: `${base}i/${inviteToken(mid)}?a=${a.id}`, ...(sms && memberById(mid)!.phone ? { smsReady: true } : {}) })) };
 }
 
 function ownAgent(owner: Member, agentId: string) {
@@ -924,6 +996,7 @@ function approveRelay(owner: Member, i: InboxRec, text: string) {
       delivered.push(mid);
     }
   }
+  for (const mid of new Set(delivered)) notifyMember(memberById(mid), `Update from ${tenant.name}: ${body}`, "relay");
   i.status = "answered";
   i.answer = body;
   (db.chatLog[`${i.agentId}:${i.fromId}`] ??= []).push({ role: "helper", text: `${owner.name.split(" ")[0]} approved your update and sent it to the ${g.name}.`, at, action: { kind: "relay_sent", summary: body } });
@@ -944,6 +1017,7 @@ export function answerInbox(owner: Member, iid: string, text: string, sharing: S
   i.answer = text;
   // The person who asked hears back in their own chat.
   (db.chatLog[`${i.agentId}:${i.fromId}`] ??= []).push({ role: "helper", text, at: now().toISOString(), action: { kind: "owner_answer", summary: text } });
+  notifyMember(memberById(i.fromId), `${owner.name.split(" ")[0]} answered${i.kind === "question" ? ` "${i.text.slice(0, 60)}${i.text.length > 60 ? "…" : ""}"` : ""}: ${text}`, "owner_answer");
   let knowledge;
   let brainImproved = false;
   if (i.kind === "question") {

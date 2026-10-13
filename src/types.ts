@@ -23,6 +23,22 @@ export interface Member {
   // Owner-only: which sources/tools this member may authorize for an agent.
   sourceScope: string[];
   toolScope: string[];
+  /** Optional mobile number in E.164 (+14155550142); lets the person text their helper (src/sms.ts). */
+  phone?: string;
+  /** Replied STOP: no outbound texts until START. */
+  smsOptOut?: boolean;
+  /** The helper they picked with "SWITCH n"; otherwise the most recent live one answers. */
+  smsAgentId?: string;
+}
+
+export interface SmsLogRec {
+  at: string;
+  dir: "in" | "out";
+  memberId: string;
+  body: string;
+  /** out: sent | simulated | skipped:<why> | failed; in: received */
+  status: string;
+  kind?: string;
 }
 
 export interface Group {
@@ -177,6 +193,8 @@ export interface DB {
   inviteTokens?: Record<string, string>;
   // tool fixture data, keyed by tenant
   toolData: Record<string, Record<string, unknown>>;
+  // SMS thread per sandbox (inbound, replies, outbound notices); the simulator page reads it.
+  smsLog?: SmsLogRec[];
 }
 
 export interface Cite { title: string; section: string; version: number }

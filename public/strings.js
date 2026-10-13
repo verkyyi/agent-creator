@@ -106,7 +106,7 @@ export const EN = {
     },
 cards: {
       noReach: "Can't reach CrewBrain. Check your signal and try again.", yourHelper: "your helper", sendName: "Send {n}",
-      copied: "Copied", holdToCopy: "Hold to copy", copy: "Copy", text: "Text", smsBody: "Here's your link for {n}: {url}",
+      copied: "Copied", holdToCopy: "Hold to copy", copy: "Copy", text: "Text", textFromCb: "Text from CrewBrain number", textFromCbHint: "CrewBrain texts the invite from the company number; they can text back their questions", texted: "Texted", smsBody: "Here's your link for {n}: {url}",
       worksUntil: "Works until {e}", andMore: "and {n} more", noLinks: "No links yet. Approve the helper first.",
       sendEveryone: "Send to everyone", showQr: "Show QR codes",
       forWho: "For {a}", endedOn: "Ended {e}", endsOn: "Ends {e}", share: "Share", openChat: "Open chat", close: "Close",
@@ -288,7 +288,7 @@ export const ES = {
     },
 cards: {
       noReach: "No se puede conectar con CrewBrain. Revisa tu señal e inténtalo otra vez.", yourHelper: "tu asistente", sendName: "Enviar {n}",
-      copied: "Copiado", holdToCopy: "Mantén pulsado para copiar", copy: "Copiar", text: "SMS", smsBody: "Aquí está tu enlace para {n}: {url}",
+      copied: "Copiado", holdToCopy: "Mantén pulsado para copiar", copy: "Copiar", text: "SMS", textFromCb: "Enviar SMS desde el número de CrewBrain", textFromCbHint: "CrewBrain envía la invitación desde el número de la empresa; pueden responder con sus preguntas", texted: "SMS enviado", smsBody: "Aquí está tu enlace para {n}: {url}",
       worksUntil: "Funciona hasta {e}", andMore: "y {n} más", noLinks: "Aún no hay enlaces. Primero aprueba el asistente.",
       sendEveryone: "Enviar a todos", showQr: "Mostrar códigos QR",
       forWho: "Para {a}", endedOn: "Terminó {e}", endsOn: "Termina {e}", share: "Compartir", openChat: "Abrir chat", close: "Cerrar",
