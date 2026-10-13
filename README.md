@@ -6,7 +6,7 @@
 |---|---|
 | **Live demo** | https://macmini.tail435588.ts.net:10000/crewbrain/demo.html (pick a person, no sign-up; every visitor gets a private copy) |
 | **Landing page** | https://verkyyi.github.io/agent-creator/ |
-| **Demo video (3:10)** | [Watch on the landing page](https://verkyyi.github.io/agent-creator/#video) · [Download 1080p](https://github.com/verkyyi/agent-creator/releases/download/v1.0-hackathon/crewbrain-demo-v3.mp4) |
+| **Demo video (3:10)** | [YouTube](https://youtu.be/xF8xrttC60o) · [Watch on the landing page](https://verkyyi.github.io/agent-creator/#video) · [Download 1080p](https://github.com/verkyyi/agent-creator/releases/download/v1.0-hackathon/crewbrain-demo-v3.mp4) |
 | **Devpost** | https://devpost.com/software/crewbrain |
 | **Built for** | Company Brain Hackathon, Menlo Park, Oct 12 2026 |
 
