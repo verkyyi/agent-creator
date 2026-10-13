@@ -117,6 +117,8 @@ export function buildApp() {
     const text = String(b.text ?? "");
     const out = await core.creatorMessage(c.get("member"), text, base(c));
     // The creator talks back in the owner's language: fixed replies are English templates.
+    // A model-written reply is already in the owner's language.
+    if (out.localized) { const { localized: _, ...rest } = out; return rest; }
     return out && typeof out.reply === "string" ? { ...out, reply: await localize(out.reply, { userText: text, lang: langOf(b.lang) }) } : out;
   }));
   // The UI string table in any language (EN/ES static; others translated once, cached on disk).

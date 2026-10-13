@@ -67,6 +67,7 @@ export interface Template {
 
 export interface AgentConfig {
   job: string;
+  summary?: string; // one sentence in the owner's language: what this helper is for (creator agent)
   audienceGroupId: string;
   name: string;
   avatar: string; // AvatarKey; string for sandboxes saved before the switch from emoji
