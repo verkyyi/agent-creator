@@ -1,6 +1,11 @@
 # CrewBrain
 
-**Voice AI helpers for contractors' crews and homeowners.** Tell CrewBrain who needs help and it makes a helper for them. Each helper only sees what you allow, answers in their language, gets real work done, and switches off when the job ends.
+**Meet Juno and Rex: AI helpers your homeowners and crew can text or talk to.** They only see what you allow, nothing goes out without your OK, and they switch off when the job ends.
+
+> **TL;DR**
+> - A small contractor tells CrewBrain who needs help, by voice, in any language. One card to approve, and a helper goes out by text or QR code.
+> - Every piece of company knowledge carries a lock. Helpers search *as their people* in HydraDB, so locked notes never come back. Proven on real query results and by 69 tests.
+> - Helpers do real work (log a damage photo, request a walkthrough, draft an update for the homeowner), always with the owner in the loop, and they stop the moment the job closes.
 
 | | |
 |---|---|
@@ -34,6 +39,14 @@ Along the way the helpers get work done: Rex files a damage photo to Sam's inbox
 - **Fast, grounded answers.** Sources appear in about 0.4 s, answers stream in about 2–3 s, and citations stay one tap away (collapsed by default).
 - **Phone first.** Installable PWA for iPhone and Android, works offline for reading, queues messages until the signal is back.
 - **Safe to demo publicly.** Every visitor gets their own sandbox; nothing one visitor does reaches another.
+
+## Why HydraDB
+
+CrewBrain's promise ("they only see what you allow") lives in the retrieval layer, and HydraDB made that practical in a day:
+- **Access lists on every source, enforced inside the search.** Each helper queries as its audience, so a locked document is never retrieved, not merely hidden from the model afterwards.
+- **One `PATCH` to relock.** Closing a job takes effect on the very next query, with no re-index.
+- **Feedback with ground truth.** When the owner answers a question a helper couldn't, the answer goes back to HydraDB so retrieval improves.
+- **Graph context.** "What's going on at 42 Oak St?" pulls related notes, issues and emails together.
 
 ## How it's built
 
