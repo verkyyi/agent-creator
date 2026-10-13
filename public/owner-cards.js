@@ -124,11 +124,19 @@ function knowledgeDraftCard(c) {
 
 function answerCard(c) {
   const res = c.results || [];
-  if (!res.length) return null;
-  return add(h("div", { class: "answer-sources" }, h("span", { class: "cb-src-label" }, "From your brain"),
+  const related = (c.related || []).slice(0, 5);
+  const open = c.open || [];
+  if (!res.length && !related.length && !open.length) return null;
+  return add(h("div", { class: "answer-sources" },
+    res.length ? h("span", { class: "cb-src-label" }, "From your brain") : null,
     res.map((r) => h("button", { class: "src-chip", type: "button", onclick: () => openSheet(r.title || "Source",
       h("div", { class: "stack" }, h("div", { class: "row-btns" }, lockChip(lockFromLabel(r.lockLabel), r.lockLabel)), r.section ? h("div", { class: "label" }, r.section) : null, h("div", { class: "quote excerpt" }, r.text || "")), { testid: "excerpt-sheet" }) },
-      lockChip(lockFromLabel(r.lockLabel), r.lockLabel), h("span", { class: "src-t" }, r.title + (r.section ? " · " + r.section : ""))))));
+      lockChip(lockFromLabel(r.lockLabel), r.lockLabel), h("span", { class: "src-t" }, r.title + (r.section ? " · " + r.section : "")))),
+    open.length ? h("span", { class: "cb-src-label" }, "Waiting on you") : null,
+    open.map((i) => h("button", { class: "src-chip", type: "button", "data-testid": "open-item", onclick: () => ctx.sendCreator("What's new?") }, h("span", { class: "src-t" }, `${i.from || "Someone"}: ${i.text}`))),
+    related.length ? h("span", { class: "cb-src-label" }, "Related (from the knowledge graph)") : null,
+    related.map((r) => h("span", { class: "src-chip related-chip", "data-testid": "related-chip", title: r.relation || "" },
+      h("span", { class: "src-t" }, `Related: ${r.title}${r.relation ? ` (${r.relation})` : ""}`)))));
 }
 
 export function renderCard(c) {

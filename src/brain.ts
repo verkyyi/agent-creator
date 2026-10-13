@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { db, id, now, record, save, isDefaultSandbox } from "./store.ts";
-import { aclFor, hydraIngest, hydraState, localSearch, principalsFor, sharingFromLabel } from "./retrieval.ts";
+import { aclFor, graphQuery, hydraIngest, localSearch, principalsFor, sharingFromLabel, type Related } from "./retrieval.ts";
 import * as core from "./core.ts";
 import { dbName, hydraCall, hydraOn } from "./memory.ts";
 import type { Member, Sharing, Source } from "./types.ts";
@@ -178,16 +178,19 @@ export async function ask(owner: Member, q: string) {
     seen.add(k);
     results.push({ sourceId: s.id, title: s.title, section, text, lockLabel: lock(s) });
   };
-  if (hydraOn() && hydraState[owner.tenantId] === "ready") {
-    try {
-      const d = await hydraCall("/query", { json: { database: dbName(owner.tenantId), collection: "brain", query, type: "knowledge", query_by: "hybrid", mode: "fast", max_results: 8, graph_context: false } }, 5000);
-      for (const ch of d?.chunks ?? []) {
-        const s = mine.find((x) => x.id === (ch.id ?? ch.source_id) && owner.sourceScope.includes(x.id));
-        if (!s) continue;
-        const sec = s.sections.find((x) => ch.chunk_content?.includes(x.text.slice(0, 40)) || ch.chunk_content?.includes(x.heading));
-        push(s, sec?.heading ?? s.sections[0]?.heading ?? "", sec?.text ?? String(ch.chunk_content ?? ""));
-      }
-    } catch (e) { console.warn("[hydra] ask failed, using local", (e as Error).message); }
+  // HydraDB in thinking mode with the context graph: ranked chunks plus "related" sources
+  // reached through entity relations (owner view, so no acl filter).
+  const scoped = mine.filter((s) => owner.sourceScope.includes(s.id));
+  let related: Related[] = [];
+  const g = await graphQuery(owner.tenantId, query, scoped);
+  if (g) {
+    for (const ch of g.chunks) {
+      const s = scoped.find((x) => x.id === (ch.id ?? ch.source_id));
+      if (!s) continue;
+      const sec = s.sections.find((x) => ch.chunk_content?.includes(x.text.slice(0, 40)) || ch.chunk_content?.includes(x.heading));
+      push(s, sec?.heading ?? s.sections[0]?.heading ?? "", sec?.text ?? (isDefaultSandbox() ? String(ch.chunk_content ?? "") : s.sections[0]?.text ?? ""));
+    }
+    related = g.related;
   }
   // Local index over every lock. Titles count too ("price book" finds "Price Book 2026").
   const principals = [...new Set(mine.flatMap((s) => aclFor(s)))];
@@ -197,7 +200,7 @@ export async function ask(owner: Member, q: string) {
     const s = mine.find((x) => x.id === ch.sourceId)!;
     push(s, ch.section.split(SEP).slice(1).join(SEP), ch.text);
   }
-  return { results: results.slice(0, 6) };
+  return { results: results.slice(0, 6), ...(related.length ? { related: related.map(({ title, relation }) => ({ title, relation })) } : {}) };
 }
 
 // ---------- routes ----------

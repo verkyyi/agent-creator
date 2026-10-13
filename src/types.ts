@@ -189,4 +189,7 @@ export interface InboxRec {
   status: "open" | "answered" | "dismissed";
   answer?: string;
   createdAt: string;
+  // HydraDB `meta.request_id` of the query the helper couldn't answer; the owner's answer
+  // is reported back against it (POST /feedback with ground_truth).
+  hydraRequestId?: string;
 }
