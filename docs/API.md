@@ -35,14 +35,17 @@ When a chat is refused, `reply` holds the sentence to show/speak.
 - `POST api/brain/drafts/:id/approve` `{ title?, text?, sharing }` → `{ item: BrainItem }`
 - `GET api/inbox` → `{ items: InboxItem[] }`
 - `POST api/inbox/:id/answer` `{ text, sharing? }` → `{ item: InboxItem, knowledge?: BrainItem }` (answer becomes a new knowledge version)
-- `POST api/inbox/:id/dismiss` → `{ item: InboxItem }`
+  For `kind: "relay"` this is the owner's approval: `text` (possibly edited) is delivered to every member of every ACTIVE
+  homeowner helper whose audience shares the relay's job, as a history message with `action.kind: "owner_update"`;
+  → `{ item, delivered: { group, members } }`. 409 `no_household_helper` (item stays open) when none is live.
+- `POST api/inbox/:id/dismiss` → `{ item: InboxItem }` (for a relay: "Not now", nothing is delivered)
 - `POST api/clock` `{ advanceMinutes?: number, reset?: true }` → `{ now }` (demo/test clock; only when TEST_CLOCK=1)
 
 ## Homeowner / crew (and owner previewing)
 
 - `GET api/agents/:id/public` → `{ id, name, avatar, tone, job, state, expiresAt, endsLabel, tenantName, ownerName, canDo: { tool, name }[] }`
 - `POST api/agents/:id/chat` `{ text, imageDataUrl?: string }` →
-  `{ reply, citations: { title, section, version }[], action?: { kind: "issue_logged"|"walkthrough_requested", summary }, refused?: true }`
+  `{ reply, citations: { title, section, version }[], action?: { kind: "issue_logged"|"walkthrough_requested"|"relay_requested", summary }, refused?: true }`
   410 `{ error: "ended", state: "expired"|"revoked", reply }` once the helper ended.
 - `GET api/agents/:id/history` → `{ messages: { role: "user"|"helper", text, at, citations?, action? }[] }`
 - `POST api/voice/session` `{ mode: "creator"|"agent", agentId? }` → `{ clientSecret, expiresAt, model, relayPath }` (503 when voice is unavailable)
@@ -72,7 +75,9 @@ type BrainItem = {
   jobId?: string; updatedAt: string; note?: string;
 };
 type InboxItem = {
-  id: string; kind: "question" | "issue" | "walkthrough"; agentId: string; agentName: string;
+  id: string; kind: "question" | "issue" | "walkthrough" | "relay"; agentId: string; agentName: string;
+  // relay only: crew → household update drafted by Rex (action.notify_homeowner); text = the draft
+  original?: string; targetGroupId?: string; targetName?: string; targetLabel?: string; deliverable?: boolean; viaHelpers?: string[];
   from: string; text: string; imageDataUrl?: string; status: "open" | "answered" | "dismissed"; createdAt: string;
 };
 ```

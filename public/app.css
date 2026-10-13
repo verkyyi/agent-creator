@@ -572,3 +572,12 @@ textarea.cb-input { resize: vertical; min-height: 110px; }
 .src-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .chat-intro { max-width: 100%; }
 .menu-pop > .menu-sep { min-height: 0; padding: 0; border-radius: 0; }
+
+/* Owner-approved update from the company, shown in the homeowner's helper (Juno). */
+.owner-update { align-self: stretch; max-width: 92%; border-radius: 14px; padding: .8rem .95rem; background: color-mix(in srgb, #4f8df5 14%, var(--screen)); border: 1.5px solid color-mix(in srgb, #4f8df5 60%, transparent); color: var(--phone-fg); display: grid; gap: .35rem; animation: msg-in .28s ease-out; }
+.owner-update .ou-head { display: flex; align-items: center; gap: .4rem; font-weight: 700; font-size: .9rem; color: #4f8df5; }
+.owner-update .ou-head .ico-i svg { width: 16px; height: 16px; }
+.owner-update blockquote { margin: 0; font-size: 1.0625rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Owner's approval card for a crew → household update. */
+.relay-card .relay-text { width: 100%; min-height: 96px; resize: vertical; }
+.cb-warn { margin: 0; color: var(--deny); font-size: .9rem; font-weight: 600; }
