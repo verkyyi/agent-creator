@@ -12,7 +12,7 @@
 <style>
 :root {
   --paper: #eef1f4; --sheet: #ffffff; --ink: #14181f; --muted: #56606e; --line: #c9d1db;
-  --chalk: #1d5fc4; --chalk-soft: #dbe6f7; --tag: #f5c400; --tag-ink: #1a1500; --phone: #0f1318;
+  --chalk: #1d5fc4; --chalk-soft: #dbe6f7; --ok: #1f7a4a; --tag: #f5c400; --tag-ink: #1a1500; --phone: #0f1318;
   --f-display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
   --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -22,12 +22,12 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #0e1217; --sheet: #161b22; --ink: #e8ecf1; --muted: #9aa5b3; --line: #2a323d;
-    --chalk: #6ea2f2; --chalk-soft: #17263d; --phone: #05070a; color-scheme: dark;
+    --chalk: #6ea2f2; --chalk-soft: #17263d; --ok: #6fd39c; --phone: #05070a; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #0e1217; --sheet: #161b22; --ink: #e8ecf1; --muted: #9aa5b3; --line: #2a323d;
-  --chalk: #6ea2f2; --chalk-soft: #17263d; --phone: #05070a; color-scheme: dark;
+  --chalk: #6ea2f2; --chalk-soft: #17263d; --ok: #6fd39c; --phone: #05070a; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -72,40 +72,26 @@ a { color: var(--chalk); }
 .hero .lede { font-size: 1.2rem; margin-top: var(--s3); }
 .ctas { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: var(--s4); }
 
-.device { justify-self: center; display: grid; gap: var(--s2); justify-items: center; width: 100%; max-width: 418px; }
-.phone {
-  width: 100%; background: var(--phone); border-radius: 40px; padding: 14px;
-  box-shadow: 0 30px 60px -30px rgba(10, 20, 40, .55), 0 0 0 2px var(--line);
-}
-.phone iframe, .phone img { width: 100%; height: auto; aspect-ratio: 390 / 780; border: 0; border-radius: 28px; background: var(--sheet); object-fit: cover; object-position: top; }
-.phone iframe { background: var(--sheet) url(landing/05-rex-spanish.png) top / cover no-repeat; }
-.phone img { display: none; }
-.device .mobile-only { display: none; }
-.device .label { text-align: center; }
-@media (max-width: 600px) {
-  .phone { max-width: 320px; border-radius: 30px; padding: 10px; }
-  .phone iframe { display: none; }
-  .phone img { display: block; border-radius: 22px; }
-  .device .mobile-only { display: inline-flex; }
-}
-
 section { padding-block: var(--s5); border-top: 2px solid var(--ink); }
-.steps { list-style: none; padding: 0; margin: var(--s4) 0 0; display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); counter-reset: step; }
+.steps { list-style: none; padding: 0; margin: var(--s4) 0 0; display: grid; gap: var(--s2); grid-template-columns: minmax(0, 1fr); counter-reset: step; }
 @media (min-width: 760px) { .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); } }
-.steps li { counter-increment: step; display: grid; gap: .6rem; align-content: start; }
-.steps li::before { content: "0" counter(step); font-family: var(--f-mono); font-weight: 700; color: var(--chalk); font-size: .9rem; }
-.steps .shot { background: var(--phone); border-radius: 22px; padding: 8px; max-width: 280px; }
-.steps .shot img { border-radius: 15px; height: auto; aspect-ratio: 390 / 600; object-fit: cover; object-position: top; width: 100%; }
-.steps p { color: var(--muted); }
-
-.trust p { font-size: 1.2rem; max-width: 52ch; margin-top: var(--s3); }
-.trust strong { color: var(--chalk); }
-.video-slot { margin-top: var(--s3); border: 2px dashed var(--line); border-radius: 12px; aspect-ratio: 16 / 9; display: grid; place-items: center; text-align: center; padding: var(--s2); color: var(--muted); font-family: var(--f-mono); max-width: 52rem; }
-
+.steps li { counter-increment: step; display: flex; align-items: flex-start; gap: .8rem; padding: 1rem; border: 2px solid var(--ink); border-radius: 10px; background: var(--sheet); }
+.steps .si { flex: none; width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; background: var(--chalk-soft); color: var(--chalk); }
+.steps .si svg { width: 24px; height: 24px; }
+.steps .num { display: block; font-family: var(--f-mono); font-weight: 700; font-size: .8rem; color: var(--chalk); }
+.steps .num::before { content: "0" counter(step); }
+.steps strong { font-size: 1.08rem; }
+.trustline { margin-top: var(--s4); font-size: 1.15rem; max-width: 62ch; display: flex; gap: .7rem; align-items: flex-start; }
+.trustline svg { flex: none; width: 26px; height: 26px; color: var(--chalk); margin-top: .1rem; }
+.trustline b { font-family: var(--f-display); text-transform: uppercase; font-size: 1.35rem; letter-spacing: .01em; }
+.trustline strong { color: var(--chalk); }
+.vbox { margin-top: var(--s3); width: 100%; border: 2px solid var(--ink); border-radius: 12px; overflow: hidden; background: #000; }
+.vbox video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: contain; }
+.video-note { margin-top: .7rem; font-size: .95rem; }
+#video p.sub { color: var(--muted); margin-top: .8rem; }
 footer { border-top: 2px solid var(--ink); padding-block: var(--s3) var(--s4); display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; justify-content: space-between; color: var(--muted); font-size: .95rem; }
-.demo-video { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border: 2px solid var(--ink); border-radius: 10px; background: #000; display: block; }
-.video-note { margin-top: .6rem; font-size: .95rem; }
 </style>
+<link rel="stylesheet" href="landing/scenes.css">
 </head>
 <body>
 <div class="wrap">
@@ -122,49 +108,83 @@ footer { border-top: 2px solid var(--ink); padding-block: var(--s3) var(--s4); d
         <p class="lede">Tell Crewbrain what your homeowners and crews need to know. It answers them by voice, in their language, sees only what you allow, and shuts off when the job ends.</p>
         <div class="ctas">
           <a class="btn" href="https://macmini.tail435588.ts.net:10000/crewbrain/demo.html">Try the live demo</a>
-          <a class="btn ghost" href="#video">Watch the 4-minute video</a>
+          <a class="btn ghost" href="#video">Watch the 3-minute video</a>
         </div>
       </div>
       <div class="device">
+        <div class="scene-cap" aria-hidden="true"></div>
         <div class="phone">
-          <iframe src="https://macmini.tail435588.ts.net:10000/crewbrain/demo.html" title="Crewbrain live demo" loading="lazy"></iframe>
-          <img src="landing/01-onboarding.png" alt="Crewbrain on a phone: the office talks to it to set up a job." width="390" height="844">
+          <div class="screen" data-scenes role="img" aria-live="off" aria-label="Animated walkthrough of four moments with Crewbrain. One: Sam, the owner, says from his truck to brief Bay Roofing's crew for the Oak St job until it closes Friday, and approves one card that sends the links. Two: a roofer on site asks Rex, the crew helper, for the gate code in Spanish and gets it, with a source. Three: the homeowner asks Juno, the homeowner helper, for the gate code and is told it is crew only; the question goes to Sam. Four: Sam closes the job, and Rex shows This helper has ended.">
+            <div class="scene" data-caption="Sam, in his truck">
+              <div class="appbar"><span class="tile office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16v10H4z"/><path d="M9 9V6h6v3M4 13h16"/></svg></span><span><b>Crewbrain</b><small>Sam · Owner</small></span></div>
+              <div class="chat">
+                <div class="orb-wrap" data-at="150 2300:gone"><div class="orb"></div><span class="meta">Listening</span></div>
+                <div class="b me" data-at="900">Brief Bay Roofing's crew for the Oak St job until it closes Friday.</div>
+                <div class="card" data-at="2300 4300:tapped">
+                  <div class="head"><span class="tile hat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 18.5h20"/><path d="M4 18.5V16a8 8 0 0 1 16 0v2.5"/><path d="M10 8.3V5.5h4v2.8"/><path d="M8 16v-3M16 16v-3"/></svg></span><span><b>Rex · Crew briefing</b><small>Bay Roofing crew · 2 people</small></span></div>
+                  <p>Gate, parking, scope and safety for 42 Oak St.</p>
+                  <div class="pills"><span>Knows 4</span><span>Can do 2</span><span class="no">Can't see 3</span></div>
+                  <span class="meta"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Ends Fri 6:00 PM</span>
+                  <div class="tapbtn">Approve and send links</div>
+                </div>
+                <div class="done" data-at="5000"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Live. Links sent by text.</div>
+              </div>
+            </div>
+            <div class="scene" data-caption="The roofer, on site">
+              <div class="appbar"><span class="tile hat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 18.5h20"/><path d="M4 18.5V16a8 8 0 0 1 16 0v2.5"/><path d="M10 8.3V5.5h4v2.8"/><path d="M8 16v-3M16 16v-3"/></svg></span><span><b>Rex</b><small>Crew helper · 42 Oak St</small></span></div>
+              <div class="chat">
+                <div class="b me" data-at="500">¿Cuál es el código de la puerta?</div>
+                <div class="typing" data-at="1500 3100:gone"><i></i><i></i><i></i></div>
+                <div class="b bot" data-at="3100">Es 4417, luego la tecla #.<span class="meta"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h4"/></svg>1 source</span></div>
+              </div>
+            </div>
+            <div class="scene" data-caption="The homeowner, at home">
+              <div class="appbar"><span class="tile house"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg></span><span><b>Juno</b><small>Homeowner helper · 42 Oak St</small></span></div>
+              <div class="chat">
+                <div class="b me" data-at="500">What's the gate code for the roofers?</div>
+                <div class="typing" data-at="1500 3100:gone"><i></i><i></i><i></i></div>
+                <div class="b bot" data-at="3100">That's not something I can see. I've passed your question to Sam.<span class="meta"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>Crew only</span></div>
+              </div>
+            </div>
+            <div class="scene" data-caption="Sam closes the job">
+              <div class="appbar"><span class="tile office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16v10H4z"/><path d="M9 9V6h6v3M4 13h16"/></svg></span><span><b>Crewbrain</b><small>Sam · Owner</small></span></div>
+              <div class="chat">
+                <div class="b me" data-at="300">Oak St is done. Close Rex.</div>
+                <div class="card" data-at="1200 2900:tapped">
+                  <div class="head"><span class="tile hat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 18.5h20"/><path d="M4 18.5V16a8 8 0 0 1 16 0v2.5"/><path d="M10 8.3V5.5h4v2.8"/><path d="M8 16v-3M16 16v-3"/></svg></span><span><b>Close Rex now?</b><small>Bay Roofing crew · 2 people</small></span></div>
+                  <p>The links stop working right away.</p>
+                  <div class="tapbtn danger"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>Close Rex now</div>
+                </div>
+              </div>
+              <div class="ended" data-at="3900">
+                <div class="appbar"><span class="tile hat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 18.5h20"/><path d="M4 18.5V16a8 8 0 0 1 16 0v2.5"/><path d="M10 8.3V5.5h4v2.8"/><path d="M8 16v-3M16 16v-3"/></svg></span><span><b>Rex</b><small>Crew helper · 42 Oak St</small></span></div>
+                <div class="body"><span class="pw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></span><b>This helper has ended</b><span class="meta"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>Site brief: back to Office only</span></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <a class="btn mobile-only" href="https://macmini.tail435588.ts.net:10000/crewbrain/demo.html">Open the live demo</a>
-        <span class="label">The real app, running live</span>
+        <div class="dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <ol class="scene-list" aria-hidden="true"><li>01 Sam, in his truck</li><li>02 The roofer, on site</li><li>03 The homeowner, at home</li><li>04 Sam closes the job</li></ol>
       </div>
     </div>
+
+    <section id="video">
+      <h2>See it in three minutes</h2>
+      <p class="sub">One owner, one job, two helpers: from a sentence in the truck to the moment access ends.</p>
+      <div class="vbox">
+        <video controls playsinline preload="metadata" poster="media/poster-v3.jpg" src="media/crewbrain-demo-v3-720p.mp4" aria-label="Crewbrain demo video, about three minutes"></video>
+      </div>
+      <p class="video-note"><a href="https://github.com/verkyyi/agent-creator/releases/download/v1.0-hackathon/crewbrain-demo-v3.mp4">Download 1080p</a></p>
+    </section>
 
     <section id="how">
       <h2>How it works</h2>
       <ol class="steps">
-        <li>
-          <div class="shot"><img src="landing/02-approval.png" alt="The office describes a helper and approves what it may see." loading="lazy" width="390" height="844"></div>
-          <h3>Say it, approve it</h3>
-          <p>Describe the helper you need out loud, then approve exactly what it may see.</p>
-        </li>
-        <li>
-          <div class="shot"><img src="landing/03-share.png" alt="Sharing a helper by text message or QR code." loading="lazy" width="390" height="844"></div>
-          <h3>Send it</h3>
-          <p>Text a link or show a QR code. No app, no account for the homeowner or crew.</p>
-        </li>
-        <li>
-          <div class="shot"><img src="landing/05-rex-spanish.png" alt="A helper welcoming a homeowner, ready for a voice question." loading="lazy" width="390" height="844"></div>
-          <h3>They ask, any language</h3>
-          <p>They ask by voice or text, in their own language. When the job closes, access ends.</p>
-        </li>
+        <li><span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span><span class="num"></span><strong>Say who needs help.</strong></span></li>
+        <li><span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><span class="num"></span><strong>Approve one card, send the link.</strong></span></li>
+        <li><span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><span class="num"></span><strong>They ask by voice, in any language. The job closes, access ends.</strong></span></li>
       </ol>
-    </section>
-
-    <section class="trust" id="trust">
-      <h2>Locked by default</h2>
-      <p>Every piece of knowledge has a lock: <strong>Office only</strong>, <strong>Crew</strong>, or <strong>Homeowners</strong>. Helpers search as their people, so locked notes never come back. Built on HydraDB, Claude and OpenAI realtime voice.</p>
-    </section>
-
-    <section id="video">
-      <h2>See it in four minutes</h2>
-      <video class="demo-video" controls playsinline preload="metadata" poster="media/poster.png" src="media/crewbrain-demo-720p.mp4"></video>
-      <p class="video-note"><a href="https://github.com/verkyyi/agent-creator/releases/tag/v1.0-hackathon">Download the 1080p version</a></p>
+      <p class="trustline" id="trust"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><span><b>Locked by default.</b> Every note carries a lock: <strong>Office only</strong>, <strong>Crew</strong> or <strong>Homeowners</strong>, and helpers only ever search as their people. Built on HydraDB, Claude and OpenAI realtime voice.</span></p>
     </section>
   </main>
 
@@ -173,5 +193,6 @@ footer { border-top: 2px solid var(--ink); padding-block: var(--s3) var(--s4); d
     <span>Built at the Company Brain Hackathon, Menlo Park, Oct 12 2026</span>
   </footer>
 </div>
+<script src="landing/scenes.js"></script>
 </body>
 </html>
