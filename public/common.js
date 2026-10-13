@@ -282,30 +282,40 @@ export function wireVoice({ btn, stateEl, mode, agentId, onTranscript, onReply, 
     const old = stateEl.querySelector(".ttfa");
     if (old) old.textContent = ttfa; else if (!stateEl.hidden) stateEl.append(h("span", { class: "ttfa mono", title: "Time to first audio" }, ttfa));
   };
+  // `starting` covers the seconds between the tap and startVoice() resolving (mic prompt,
+  // WebRTC handshake). A tap then must cancel that attempt, not start a second session.
+  let starting = null;
   const stop = () => {
     const s = session; session = null;
+    const c = starting; starting = null;
+    try { c?.abort(); } catch {}
     try { s?.stop(); } catch {}
     btn.classList.remove("live"); btn.innerHTML = ICON.mic; btn.setAttribute("aria-label", "Talk"); btn.setAttribute("aria-pressed", "false"); setState("");
   };
   btn.innerHTML = ICON.mic;
   btn.addEventListener("click", async () => {
-    if (session) return stop();
+    if (session || starting) return stop();
     btn.classList.add("live"); btn.innerHTML = ICON.stop; btn.setAttribute("aria-label", "Stop talking"); btn.setAttribute("aria-pressed", "true");
     setState("connecting");
     let mod;
     try { mod = await import("./voice.js"); }
     catch { stop(); toast(voiceErr || "Voice isn't available right now. Type your message instead.", "err"); return; }
+    const ctrl = new AbortController();
+    starting = ctrl;
     try {
-      session = await mod.startVoice({
-        mode, agentId,
-        onState: (s) => { if (session || s) setState(s); if (s === "stopped" || s === "closed") stop(); },
+      const sess = await mod.startVoice({
+        mode, agentId, signal: ctrl.signal,
+        onState: (s) => { if (ctrl.signal.aborted) return; setState(s); if (s === "stopped" || s === "closed") stop(); },
         onTranscript: (text, who) => onTranscript?.(text, who),
         onReply: (json) => onReply?.(json),
         onMetrics,
-        onError: (msg) => { stop(); toast(msg || "Voice stopped. You can type instead.", "err"); },
+        onError: (msg) => { if (ctrl.signal.aborted) return; stop(); toast(msg || "Voice stopped. You can type instead.", "err"); },
       });
+      if (ctrl.signal.aborted) { try { sess?.stop(); } catch {} return; } // cancelled while connecting
+      starting = null;
+      session = sess;
       if (!session) stop();
-    } catch (e) { stop(); toast((e && e.message) || voiceErr || "Couldn't start voice. Type your message instead.", "err"); }
+    } catch (e) { if (ctrl.signal.aborted) return; stop(); toast((e && e.message) || voiceErr || "Couldn't start voice. Type your message instead.", "err"); }
   });
   return { stop, start: () => { if (!session) btn.click(); } };
 }

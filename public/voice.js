@@ -44,7 +44,7 @@ async function postJson(url, body) {
   return { res, json };
 }
 
-export async function startVoice({ mode, agentId, persona, onState, onTranscript, onReply, onError, onMetrics } = {}) {
+export async function startVoice({ mode, agentId, persona, onState, onTranscript, onReply, onError, onMetrics, signal } = {}) {
   const state = (s) => { try { onState && onState(s); } catch (_) {} };
   const fail = (err) => { try { onError && onError(friendly(err), err); } catch (_) {} };
   const emit = (fn, ...a) => { try { fn && fn(...a); } catch (_) {} };
@@ -89,6 +89,11 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
       try { audioEl.srcObject = null; audioEl.remove(); } catch (_) {}
     }
     state("stopped");
+  }
+  // The caller can cancel while we're still connecting (mic prompt, SDP exchange).
+  if (signal) {
+    if (signal.aborted) { stopped = true; return { stop }; }
+    signal.addEventListener("abort", stop, { once: true });
   }
 
   function send(evt) {
@@ -201,7 +206,8 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
     mic = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
-    if (stopped) { stop(); return { stop }; }
+    // Cancelled while the mic prompt was open: stop() already ran, so release the mic here.
+    if (stopped) { mic.getTracks().forEach((t) => t.stop()); mic = null; return { stop }; }
 
     // 3. Peer connection + remote audio (hidden <audio autoplay playsinline> for iOS Safari).
     pc = new RTCPeerConnection();
@@ -343,7 +349,7 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
     });
     if (!sdpRes.ok) throw codedError("network");
     const answerSdp = await sdpRes.text();
-    if (stopped) return { stop };
+    if (stopped) { try { pc.close(); } catch (_) {} return { stop }; }
     await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
   } catch (err) {
     fail(err);
