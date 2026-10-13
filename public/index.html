@@ -30,21 +30,21 @@
   <div class="bar-right">
     <div class="tenant" id="tenant"><b id="tenant-name">&nbsp;</b><span id="member-name"></span></div>
     <button class="back-chat" id="back-chat" type="button" hidden>Chat</button>
-    <button class="menu-btn more-btn" id="menu-btn" type="button" aria-label="More" aria-haspopup="true" aria-expanded="false"></button>
+    <button class="menu-btn more-btn" id="menu-btn" type="button" aria-label="More" data-i18n-aria="menu.more" aria-haspopup="true" aria-expanded="false"></button>
   </div>
   <div class="menu-pop" id="menu-pop" role="menu" hidden>
-    <button class="more-item" id="tab-create" role="menuitem" data-tab="create" type="button"><span data-icon="chat"></span>Chat with Crewbrain</button>
-    <button class="more-item" id="tab-helpers" role="menuitem" data-tab="helpers" type="button"><span data-icon="helpers"></span>My helpers</button>
-    <button class="more-item" id="tab-inbox" role="menuitem" data-tab="inbox" type="button"><span data-icon="inbox"></span>Inbox<span class="badge" id="inbox-badge" hidden>0</span></button>
-    <button class="more-item" id="tab-brain" role="menuitem" data-tab="brain" type="button"><span data-icon="brain"></span>Brain</button>
+    <button class="more-item" id="tab-create" role="menuitem" data-tab="create" type="button"><span data-icon="chat"></span><span data-i18n="menu.chat">Chat with Crewbrain</span></button>
+    <button class="more-item" id="tab-helpers" role="menuitem" data-tab="helpers" type="button"><span data-icon="helpers"></span><span data-i18n="menu.helpers">My helpers</span></button>
+    <button class="more-item" id="tab-inbox" role="menuitem" data-tab="inbox" type="button"><span data-icon="inbox"></span><span data-i18n="menu.inbox">Inbox</span><span class="badge" id="inbox-badge" hidden>0</span></button>
+    <button class="more-item" id="tab-brain" role="menuitem" data-tab="brain" type="button"><span data-icon="brain"></span><span data-i18n="menu.brain">Brain</span></button>
     <hr class="menu-sep">
-    <button type="button" role="menuitem" id="how-btn">How it works</button>
-    <a role="menuitem" href="demo.html">Switch person (demo)</a>
+    <button type="button" role="menuitem" id="how-btn" data-i18n="menu.how">How it works</button>
+    <a role="menuitem" href="demo.html" data-i18n="menu.switch">Switch person (demo)</a>
   </div>
   <div class="clock-pop" id="clock-pop" hidden>
-    <div class="label">Demo clock</div>
-    <button class="btn small" id="clock-advance" type="button">Skip ahead 1 day</button>
-    <button class="btn small ghost" id="clock-reset" type="button">Reset clock</button>
+    <div class="label" data-i18n="clock.title">Demo clock</div>
+    <button class="btn small" id="clock-advance" type="button" data-i18n="clock.advance">Skip ahead 1 day</button>
+    <button class="btn small ghost" id="clock-reset" type="button" data-i18n="clock.reset">Reset clock</button>
     <div class="mono muted" id="clock-now" style="font-size:.7rem"></div>
   </div>
 </header>
@@ -62,19 +62,19 @@
       <input id="attach-photo-input" type="file" accept="image/*" capture="environment" hidden>
       <input id="attach-file-input" type="file" accept=".pdf,.txt,.md,.docx,.csv,application/pdf,text/plain,text/markdown,text/csv" hidden>
       <div class="comp-row">
-        <button class="icon-btn attach" id="attach-owner-btn" type="button" aria-label="Add a photo, file or voice note" aria-haspopup="true" aria-expanded="false"></button>
+        <button class="icon-btn attach" id="attach-owner-btn" type="button" aria-label="Add a photo, file or voice note" data-i18n-aria="create.attach" aria-haspopup="true" aria-expanded="false"></button>
         <div class="field-wrap">
-          <input id="composer-input" type="text" enterkeyhint="send" placeholder="Type or tap the mic…" aria-label="Message">
-          <button class="icon-btn send" id="send-btn" type="submit" aria-label="Send" disabled></button>
+          <input id="composer-input" type="text" enterkeyhint="send" placeholder="Type or tap the mic…" data-i18n-ph="create.placeholder" aria-label="Message" data-i18n-aria="create.message">
+          <button class="icon-btn send" id="send-btn" type="submit" aria-label="Send" data-i18n-aria="create.send" disabled></button>
         </div>
-        <button class="mic" id="mic-btn" type="button" aria-label="Tap and talk" aria-pressed="false"></button>
+        <button class="mic" id="mic-btn" type="button" aria-label="Tap and talk" data-i18n-aria="create.talk" aria-pressed="false"></button>
       </div>
     </form>
   </section>
 
   <section class="view" id="view-brain" data-view="brain" hidden>
     <div class="view-head">
-      <div><h2>Brain</h2><p>Everything you know, with a lock on every page.</p></div>
+      <div><h2 data-i18n="views.brainTitle">Brain</h2><p data-i18n="views.brainSub">Everything you know, with a lock on every page.</p></div>
       <button class="btn yellow" id="snap-btn" type="button"></button>
     </div>
     <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
@@ -82,12 +82,12 @@
   </section>
 
   <section class="view" id="view-helpers" data-view="helpers" hidden>
-    <div class="view-head"><div><h2>Helpers</h2><p>Who can use each helper, and when it shuts off.</p></div></div>
+    <div class="view-head"><div><h2 data-i18n="views.helpersTitle">Helpers</h2><p data-i18n="views.helpersSub">Who can use each helper, and when it shuts off.</p></div></div>
     <div class="cards" id="helper-list"></div>
   </section>
 
   <section class="view" id="view-inbox" data-view="inbox" hidden>
-    <div class="view-head"><div><h2>Inbox</h2><p>Questions and problems your helpers passed to you.</p></div></div>
+    <div class="view-head"><div><h2 data-i18n="views.inboxTitle">Inbox</h2><p data-i18n="views.inboxSub">Questions and problems your helpers passed to you.</p></div></div>
     <div id="inbox-list"></div>
   </section>
 </main>

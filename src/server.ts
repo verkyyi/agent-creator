@@ -109,13 +109,13 @@ export function buildApp() {
 
   app.get("/api/me", wrap((c) => {
     const m = c.get("member");
-    return { member: { id: m.id, name: m.name, role: m.role, tenantId: m.tenantId, tenantName: core.tenantOf(m.tenantId).name }, helpers: core.helpersFor(m) };
+    return { member: { id: m.id, name: m.name, role: m.role, tenantId: m.tenantId, tenantName: core.tenantOf(m.tenantId).name, timeZone: core.tenantOf(m.tenantId).timeZone }, helpers: core.helpersFor(m) };
   }));
 
   app.post("/api/creator/message", wrap(async (c) => {
     const b = await c.req.json();
     const text = String(b.text ?? "");
-    const out = await core.creatorMessage(c.get("member"), text, base(c));
+    const out = await core.creatorMessage(c.get("member"), text, base(c), langOf(b.lang));
     // The creator talks back in the owner's language: fixed replies are English templates.
     // A model-written reply is already in the owner's language.
     if (out.localized) { const { localized: _, ...rest } = out; return rest; }

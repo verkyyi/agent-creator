@@ -81,6 +81,42 @@ test("api/i18n/es returns the full key set", async () => {
   assert.deepEqual(j.strings, ES);
 });
 
+test("api/i18n/es carries the owner UI section (v2 table)", async () => {
+  const s = await signIn("sam");
+  const j = await (await get(s, "api/i18n/es")).json() as any;
+  assert.equal(j.version, 2);
+  const own = j.strings.owner, enOwn = (EN as any).owner;
+  assert.ok(own && typeof own === "object", "owner section present");
+  assert.ok(Object.keys(enOwn).length >= 5, "owner section is substantial");
+  assert.ok(sameShape(enOwn, own), "owner keys match English");
+  assert.notEqual(own.create.title, enOwn.create.title, "owner strings are Spanish");
+  assert.ok(Array.isArray(own.create.suggestions) && own.create.suggestions.length === enOwn.create.suggestions.length);
+});
+
+test("api/i18n: a v1 cache file (no owner section) is ignored; a v2 file is served", async () => {
+  const { writeFileSync, mkdirSync } = await import("node:fs");
+  mkdirSync(process.env.I18N_DIR!, { recursive: true });
+  const { owner: _o, ...v1 } = EN as any;
+  writeFileSync(join(process.env.I18N_DIR!, "fr.json"), JSON.stringify(v1));
+  const s = await signIn("sam");
+  const stale = await (await get(s, "api/i18n/fr")).json() as any;
+  assert.equal(stale.lang, "en", "v1 file not used");
+  const v2 = JSON.parse(JSON.stringify(EN)); v2.owner.create.title = "Que vous faut-il ?";
+  writeFileSync(join(process.env.I18N_DIR!, "fr.v2.json"), JSON.stringify(v2));
+  const fresh = await (await get(s, "api/i18n/fr")).json() as any;
+  assert.equal(fresh.lang, "fr");
+  assert.equal(fresh.strings.owner.create.title, "Que vous faut-il ?");
+});
+
+test("api/me and proposals carry the company time zone for client-side dates", async () => {
+  const sam = await signIn("sam");
+  const me = await (await get(sam, "api/me")).json() as any;
+  assert.equal(me.member.timeZone, "America/Los_Angeles");
+  const r = await (await post(sam, "api/creator/message", { text: "Brief Bay Roofing's crew for the Oak St job until the job closes Friday 6pm" })).json() as any;
+  assert.equal(r.proposal.timeZone, "America/Los_Angeles");
+  assert.ok(Number.isFinite(Date.parse(r.proposal.endsAt)));
+});
+
 test("api/i18n: unknown language offline → English table with 200", async () => {
   const s = await signIn("marco");
   for (const l of ["vi", "xx-YY", "not a lang"]) {

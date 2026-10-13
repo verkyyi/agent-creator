@@ -137,8 +137,19 @@ export function sameShape(src: unknown, got: unknown): boolean {
   return false;
 }
 
+/** Bump when the table gains sections (v2: the owner UI). Old cache files are ignored. Keep in step with public/strings.js. */
+export const I18N_VERSION = 2;
+
 const inflight = new Map<string, Promise<Record<string, unknown> | null>>();
+/** The helper section and the owner section translate in parallel; both must validate. */
 async function translateTable(lang: string, en: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  const { owner, ...helper } = en as { owner?: Record<string, unknown> } & Record<string, unknown>;
+  const [h, o] = await Promise.all([translatePart(lang, helper), translatePart(lang, owner ?? {})]);
+  if (!h || !o) return null;
+  const out = { ...h, owner: o };
+  return sameShape(en, out) ? out : null;
+}
+async function translatePart(lang: string, en: Record<string, unknown>): Promise<Record<string, unknown> | null> {
   if (offline() || !process.env.OPENAI_API_KEY) return null;
   try {
     const r = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -147,11 +158,11 @@ async function translateTable(lang: string, en: Record<string, unknown>): Promis
       body: JSON.stringify({
         model: process.env.OPENAI_FAST_MODEL ?? "gpt-4.1-mini", temperature: 0, response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: `You translate an app's UI strings from English into the language with BCP-47 code "${lang}". Return a JSON object with exactly the same keys and nesting; every value a string (arrays keep the same length). Translate exactly and naturally for a mobile app; keep {placeholders}, names, numbers and the "…" character unchanged. Output only the JSON.` },
+          { role: "system", content: `You translate an app's UI strings from English into the language with BCP-47 code "${lang}". Return a JSON object with exactly the same keys and nesting; every value a string (arrays keep the same length). Translate exactly and naturally for a mobile app; keep {placeholders}, numbers and the "…" character unchanged. Do not translate proper names: the product name "Crewbrain", people's, helpers' and company names, codes. Output only the JSON.` },
           { role: "user", content: JSON.stringify(en) },
         ],
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(60_000),
     });
     if (!r.ok) { console.warn("[i18n] table failed", r.status); return null; }
     const j = (await r.json()) as any;
@@ -161,23 +172,25 @@ async function translateTable(lang: string, en: Record<string, unknown>): Promis
 }
 
 /** The UI table for `lang`: EN/ES static, others translated once and cached on disk. English on failure. */
-export async function uiTable(raw: string): Promise<{ lang: string; strings: Record<string, unknown> }> {
+export async function uiTable(raw: string): Promise<{ lang: string; version: number; strings: Record<string, unknown> }> {
   const { en, es } = await tables();
   const lang = validLang(raw) ? raw : "en";
   const b = baseLang(lang);
-  if (b === "en") return { lang: "en", strings: en };
-  if (b === "es") return { lang: "es", strings: es };
-  const file = join(I18N_DIR(), `${lang.toLowerCase()}.json`);
+  const version = I18N_VERSION;
+  if (b === "en") return { lang: "en", version, strings: en };
+  if (b === "es") return { lang: "es", version, strings: es };
+  // Versioned file name: a v1 cache (no owner section) is never read, so it gets regenerated.
+  const file = join(I18N_DIR(), `${lang.toLowerCase()}.v${I18N_VERSION}.json`);
   try {
     if (existsSync(file)) {
       const got = JSON.parse(readFileSync(file, "utf8"));
-      if (sameShape(en, got)) return { lang, strings: got };
+      if (sameShape(en, got)) return { lang, version, strings: got };
     }
   } catch { /* re-translate */ }
   let p = inflight.get(lang);
   if (!p) { p = translateTable(lang, en); inflight.set(lang, p); p.finally(() => inflight.delete(lang)); }
   const got = await p;
-  if (!got) return { lang: "en", strings: en };
+  if (!got) return { lang: "en", version, strings: en };
   try { mkdirSync(I18N_DIR(), { recursive: true }); writeFileSync(file, JSON.stringify(got, null, 1)); } catch (e) { console.warn("[i18n] cache write", (e as Error).message); }
-  return { lang, strings: got };
+  return { lang, version, strings: got };
 }

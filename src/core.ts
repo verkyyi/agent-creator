@@ -75,7 +75,7 @@ export function summary(a: Agent) {
   return {
     id: a.id, name: c.name, avatar: c.avatar, templateId: a.templateId, state: lifecycle(a),
     audienceName: g?.name ?? "", audienceCount: g?.memberIds.length ?? 0,
-    expiresAt: c.expiresAt, endsLabel: endsLabel(c.expiresAt, c.timeZone), activeRev: a.activeRev, pendingRev: a.pendingRev,
+    expiresAt: c.expiresAt, endsLabel: endsLabel(c.expiresAt, c.timeZone), timeZone: c.timeZone, activeRev: a.activeRev, pendingRev: a.pendingRev,
   };
 }
 
@@ -100,7 +100,7 @@ function proposalOf(a: Agent, r: Revision, changes?: string[]) {
     canCheck: tools.filter((t) => t.operation === "read").map((t) => ({ tool: t.id, name: t.name })),
     canDo: tools.filter((t) => t.operation === "write").map((t) => ({ tool: t.id, name: t.name })),
     cantSee: db.sources.filter((s) => s.tenantId === a.tenantId && owner.sourceScope.includes(s.id) && !visible.has(s.id)).map((s) => s.title),
-    endsAt: c.expiresAt, endsLabel: endsLabel(c.expiresAt, c.timeZone), escalation: owner.name, changes,
+    endsAt: c.expiresAt, endsLabel: endsLabel(c.expiresAt, c.timeZone), timeZone: c.timeZone, escalation: owner.name, changes,
   };
 }
 
@@ -432,7 +432,7 @@ function creatorTools(owner: Member, base: string, sink: Sink): ToolSpec[] {
   ];
 }
 
-export async function creatorMessage(owner: Member, text: string, base = "./"): Promise<Reply> {
+export async function creatorMessage(owner: Member, text: string, base = "./", lang?: string): Promise<Reply> {
   if (owner.role !== "owner") throw new HttpError(403, { error: "forbidden" });
   const prior = (db.creatorLog[owner.id] ?? []).slice(-12) as { role: string; text: string; proposal?: any }[];
   log(owner, "owner", text);
@@ -445,7 +445,11 @@ export async function creatorMessage(owner: Member, text: string, base = "./"): 
     }));
     const touched = () => !!(sink.proposal || sink.replyDraft || sink.cards.length);
     const started = Date.now();
-    const out = await engine({ system: creatorSystem(owner), history, message: text, tools: creatorTools(owner, base, sink), touched });
+    // The owner's picked UI language wins over guessing from a short message ("ok", a name).
+    const langNote = lang && !/^en\b/i.test(lang) && lang !== "auto"
+      ? `\n\nThe owner's app is set to the language with BCP-47 code "${lang}". Write every reply in that language, even when their message is short or mixed; keep names, codes and knowledge titles as they are.`
+      : "";
+    const out = await engine({ system: creatorSystem(owner) + langNote, history, message: text, tools: creatorTools(owner, base, sink), touched });
     console.log(`[creator] engine ${out ? "ok" : "failed"} in ${Date.now() - started} ms${sink.proposal ? " (proposal)" : ""}`);
     if (out || touched()) {
       const reply = out ?? sink.fallback ?? "Done. Check the card.";

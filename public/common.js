@@ -1,6 +1,7 @@
 // Shared helpers for the Crewbrain owner app and helper chat. Relative URLs only.
 
 import { icon as svgIcon, avatarKey, ICON_NAMES } from "./icons.js";
+import { ot, ownerLocale } from "./strings.js";
 export { svgIcon, avatarKey };
 
 // Every icon in the one set (icons.js) as an SVG string, keyed by name.
@@ -20,13 +21,9 @@ export function avatar(av, cls = "", fallback = "house") {
 }
 
 /* ---------- plain-language labels ---------- */
-export const ORIGIN = {
-  drive: { icon: "drive", label: "From Google Drive" },
-  gmail: { icon: "gmail", label: "From Gmail" },
-  photo: { icon: "photo", label: "Photo" },
-  answer: { icon: "answer", label: "Your answer" },
-  doc: { icon: "doc", label: "Document" },
-};
+// Labels are getters so they read the owner table loaded after import.
+const originOf = (k) => ({ icon: k, get label() { return ot(`common.origin.${k}`); } });
+export const ORIGIN = { drive: originOf("drive"), gmail: originOf("gmail"), photo: originOf("photo"), answer: originOf("answer"), doc: originOf("doc") };
 export function originBadge(origin) {
   const o = ORIGIN[origin] || ORIGIN.doc;
   return h("span", { class: "origin" }, icon(o.icon), o.label);
@@ -34,7 +31,8 @@ export function originBadge(origin) {
 export function fmtDate(iso) {
   const d = iso ? new Date(iso) : null;
   if (!d || isNaN(d)) return "";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  try { return d.toLocaleDateString(ownerLocale(), { month: "short", day: "numeric" }); }
+  catch { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
 }
 
 /* ---------- storage (never throws) ---------- */
@@ -60,7 +58,7 @@ export async function api(path, body, method) {
   if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
   let res;
   try { res = await fetch(path, opts); }
-  catch (e) { return { ok: false, status: 0, data: { error: "Can't reach Crewbrain. Check your signal and try again." } }; }
+  catch (e) { return { ok: false, status: 0, data: { error: ot("common.netErr") } }; }
   let data = {};
   try { data = await res.json(); } catch { /* empty body */ }
   return { ok: res.ok, status: res.status, data };
@@ -105,17 +103,14 @@ export async function downscale(file, max = 1280) {
 }
 
 /* ---------- locks ---------- */
-export const LOCKS = [
-  { v: "internal", cls: "office", label: "Office only", sub: "never leaves" },
-  { v: "crew", cls: "crew", label: "Crew", sub: "job crew" },
-  { v: "customer", cls: "home", label: "Homeowners", sub: "customers" },
-];
+const lockOf = (v, cls) => ({ v, cls, get label() { return ot(`common.lock.${v}`); }, get sub() { return ot(`common.lock.${v}Sub`); } });
+export const LOCKS = [lockOf("internal", "office"), lockOf("crew", "crew"), lockOf("customer", "home")];
 export const lockCls = (s) => (LOCKS.find((l) => l.v === s) || LOCKS[0]).cls;
 export const lockChip = (sharing, label) => h("span", { class: "lock " + lockCls(sharing) }, label || (LOCKS.find((l) => l.v === sharing) || LOCKS[0]).label);
 
 export function lockPicker(value) {
   let cur = value || "internal";
-  const wrap = h("div", { class: "lock-picker", role: "group", "aria-label": "Who can see this", "data-testid": "lock-picker" });
+  const wrap = h("div", { class: "lock-picker", role: "group", "aria-label": ot("common.lock.whoCanSee"), "data-testid": "lock-picker" });
   const btns = LOCKS.map((l) => {
     const b = h("button", { type: "button", "data-sharing": l.v, "aria-pressed": String(l.v === cur), onclick: () => { cur = l.v; btns.forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.sharing === cur))); } },
       lockChip(l.v, l.label), h("small", {}, l.sub));
@@ -133,7 +128,7 @@ export function openSheet(title, body, { className = "", testid } = {}) {
   const back = h("div", { class: "sheet-backdrop", onclick: closeSheet });
   const panel = h("div", { class: "sheet " + className, role: "dialog", "aria-modal": "true", "aria-label": title, "data-testid": testid },
     h("div", { class: "grab" }),
-    h("div", { class: "sheet-head" }, h("h3", {}, title), h("button", { class: "sheet-close", type: "button", "aria-label": "Close", onclick: closeSheet, html: ICON.x })),
+    h("div", { class: "sheet-head" }, h("h3", {}, title), h("button", { class: "sheet-close", type: "button", "aria-label": ot("common.close"), onclick: closeSheet, html: ICON.x })),
     body);
   document.body.append(back, panel);
   current = { back, panel };
@@ -171,9 +166,9 @@ const firstName = (n) => String(n || "").trim().split(/\s+/)[0] || "";
 function jobShort(job) {
   const j = String(job || "").trim().replace(/[.]+$/, "");
   const street = j.match(/\b(?:\d+\s+)?[A-Z][\w']*(?:\s+[A-Z][\w']*)?\s+(?:St|Street|Ave|Avenue|Rd|Road|Dr|Drive|Ln|Lane|Blvd|Way|Ct|Court|Pl)\b\.?/);
-  if (street) return `the ${street[0].replace(/\.$/, "")} job`;
-  if (!j || j.length > 32) return "the job";
-  return /^the\s/i.test(j) ? j : "the " + j;
+  if (street) return ot("common.share.streetJob", { s: street[0].replace(/\.$/, "") });
+  if (!j || j.length > 32) return ot("common.share.theJob");
+  return /^the\s/i.test(j) ? j : ot("common.share.theX", { j });
 }
 let meP;
 function loadMe() {
@@ -185,15 +180,15 @@ function btnI(svg, label, attrs = {}) {
 
 /** Full-screen "Show on site" QR view. */
 export async function showOnSite(l, helperName) {
-  const img = h("img", { alt: `QR code for ${l.name}'s link`, class: "onsite-qr" });
+  const img = h("img", { alt: ot("common.share.qrAlt", { n: l.name }), class: "onsite-qr" });
   let lock = null;
   const close = () => { view.remove(); document.removeEventListener("keydown", onKey, true); try { lock && lock.release(); } catch {} };
   const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
-  const view = h("div", { class: "onsite", role: "dialog", "aria-modal": "true", "aria-label": `Show on site: ${l.name}`, "data-testid": "onsite-qr" },
-    h("button", { class: "sheet-close onsite-close", type: "button", "aria-label": "Close", onclick: close, html: ICON.x }),
-    h("div", { class: "onsite-who" }, h("b", {}, l.name), h("span", {}, helperName || "Your helper")),
+  const view = h("div", { class: "onsite", role: "dialog", "aria-modal": "true", "aria-label": ot("common.share.onSite", { n: l.name }), "data-testid": "onsite-qr" },
+    h("button", { class: "sheet-close onsite-close", type: "button", "aria-label": ot("common.close"), onclick: close, html: ICON.x }),
+    h("div", { class: "onsite-who" }, h("b", {}, l.name), h("span", {}, helperName || ot("common.share.yourHelper"))),
     h("div", { class: "onsite-card" }, img),
-    h("p", { class: "onsite-hint" }, "Scan with your phone camera"));
+    h("p", { class: "onsite-hint" }, ot("common.share.scan")));
   document.body.append(view);
   document.addEventListener("keydown", onKey, true);
   try { if (navigator.wakeLock) lock = await navigator.wakeLock.request("screen"); } catch {}
@@ -204,26 +199,27 @@ export async function showOnSite(l, helperName) {
   } catch { img.replaceWith(h("p", { class: "onsite-url" }, l.url)); }
 }
 
-export function shareSheet(links, { title = "Share links", helperName = "", endsLabel = "", job = "" } = {}) {
-  const helper = helperName || "Your helper";
+export function shareSheet(links, { title = ot("common.share.title"), helperName = "", endsLabel = "", job = "" } = {}) {
+  const helper = helperName || ot("common.share.yourHelper");
   const body = h("div", { class: "stack" });
-  const panel = openSheet(title, links.length ? body : h("div", { class: "empty" }, "No links yet. Approve the helper first, then come back here."), { className: "share-sheet", testid: "share-sheet" });
+  const panel = openSheet(title, links.length ? body : h("div", { class: "empty" }, ot("common.share.none")), { className: "share-sheet", testid: "share-sheet" });
   if (!links.length) return panel;
 
   const render = (me) => {
-    const owner = firstName(me.name), company = me.tenantName || "our team";
-    const msg = (l) => `Hi ${firstName(l.name)}, this is ${owner ? owner + " " : ""}from ${company}. ${helper} can answer your questions about ${jobShort(job)}${endsLabel ? ` until ${endsLabel}` : ""}: ${l.url}`;
+    const owner = firstName(me.name), company = me.tenantName || ot("common.share.ourTeam");
+    const msg = (l) => ot(endsLabel ? "common.share.msgUntil" : "common.share.msg", { first: firstName(l.name), owner, company, helper, job: jobShort(job), ends: endsLabel, url: l.url });
     const smsHref = (l) => "sms:?&body=" + encodeURIComponent(msg(l));
-    const mailHref = (l) => `mailto:?subject=${encodeURIComponent(`${helper} from ${company}`)}&body=${encodeURIComponent(msg(l))}`;
+    const subject = ot("common.share.subject", { helper, company });
+    const mailHref = (l) => `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg(l))}`;
 
     let next = 0;
     const nextBtn = h("a", { class: "btn yellow block ss-all", "data-testid": "send-all" });
     const setNext = (i) => {
       next = i;
-      if (i >= links.length) { nextBtn.innerHTML = ""; nextBtn.append(h("span", { class: "ss-ico", html: ICON.check }), "All sent"); nextBtn.removeAttribute("href"); nextBtn.classList.add("done"); return; }
+      if (i >= links.length) { nextBtn.innerHTML = ""; nextBtn.append(h("span", { class: "ss-ico", html: ICON.check }), ot("common.share.allSent")); nextBtn.removeAttribute("href"); nextBtn.classList.add("done"); return; }
       nextBtn.href = smsHref(links[i]);
       nextBtn.innerHTML = "";
-      nextBtn.append(h("span", { class: "ss-ico", "aria-hidden": "true", html: SI.text }), i === 0 ? "Send to everyone" : `Next: ${links[i].name}`);
+      nextBtn.append(h("span", { class: "ss-ico", "aria-hidden": "true", html: SI.text }), i === 0 ? ot("common.share.sendAll") : ot("common.share.next", { n: links[i].name }));
     };
     nextBtn.addEventListener("click", (e) => {
       if (next >= links.length) { e.preventDefault(); return; }
@@ -232,21 +228,21 @@ export function shareSheet(links, { title = "Share links", helperName = "", ends
     });
 
     const rows = links.map((l, i) => {
-      const copyBtn = btnI(SI.copy, "Copy", { onclick: async () => {
+      const copyBtn = btnI(SI.copy, ot("common.share.copy"), { onclick: async () => {
         const ok = await copyText(l.url);
-        copyBtn.lastChild.textContent = ok ? "Copied" : "Hold link to copy";
-        setTimeout(() => (copyBtn.lastChild.textContent = "Copy"), 1600);
+        copyBtn.lastChild.textContent = ok ? ot("common.share.copied") : ot("common.share.holdCopy");
+        setTimeout(() => (copyBtn.lastChild.textContent = ot("common.share.copy")), 1600);
       } });
-      const shareBtn = navigator.share ? btnI(ICON.share, "Share…", { "aria-label": `Share ${l.name}'s link`, onclick: async () => {
-        try { await navigator.share({ title: `${helper} from ${company}`, text: msg(l).replace(`: ${l.url}`, ":"), url: l.url }); } catch {}
+      const shareBtn = navigator.share ? btnI(ICON.share, ot("common.share.share"), { "aria-label": ot("common.share.shareAria", { n: l.name }), onclick: async () => {
+        try { await navigator.share({ title: subject, text: msg(l).replace(`: ${l.url}`, ":"), url: l.url }); } catch {}
       } }) : null;
-      const textA = btnI(SI.text, "Text", { href: smsHref(l), class: "btn small ss-btn ss-text", "aria-label": `Text ${l.name}` });
+      const textA = btnI(SI.text, ot("common.share.text"), { href: smsHref(l), class: "btn small ss-btn ss-text", "aria-label": ot("common.share.textAria", { n: l.name }) });
       return h("div", { class: "link-row", "data-member": l.memberId },
         h("div", { class: "ss-who" }, h("span", { class: "nm" }, l.name), h("span", { class: "url" }, l.url)),
         h("div", { class: "ss-actions" },
           textA,
-          btnI(SI.mail, "Email", { href: mailHref(l), "aria-label": `Email ${l.name}` }),
-          btnI(SI.qr, "QR", { class: "btn small ghost ss-btn qr-btn", "aria-label": `Show QR for ${l.name}`, onclick: () => showOnSite(l, helper) }),
+          btnI(SI.mail, ot("common.share.email"), { href: mailHref(l), "aria-label": ot("common.share.emailAria", { n: l.name }) }),
+          btnI(SI.qr, "QR", { class: "btn small ghost ss-btn qr-btn", "aria-label": ot("common.share.qrAria", { n: l.name }), onclick: () => showOnSite(l, helper) }),
           copyBtn, shareBtn));
     });
     rows.forEach((r) => { const t = r.querySelector(".ss-text"); t.onclick = () => r.classList.add("sent"); });
@@ -254,7 +250,7 @@ export function shareSheet(links, { title = "Share links", helperName = "", ends
     body.replaceChildren(
       links.length > 1 ? nextBtn : null,
       h("div", { class: "links" }, rows),
-      h("p", { class: "ss-note" }, icon("lock"), h("span", {}, "Each link is personal. A forwarded link won't work for anyone else, and every link stops when the job closes.")));
+      h("p", { class: "ss-note" }, icon("lock"), h("span", {}, ot("common.share.note"))));
   };
   render({});
   loadMe().then(render);
@@ -262,16 +258,11 @@ export function shareSheet(links, { title = "Share links", helperName = "", ends
 }
 
 /* ---------- voice ---------- */
-const STATE_TEXT = { connecting: "Connecting…", listening: "Listening…", thinking: "Thinking…", speaking: "Speaking…" };
-/** Overlay + voice-card strings. Callers override any of them (a.html passes Spanish). */
-export const VOICE_TEXT = {
-  ...STATE_TEXT,
-  title: "Voice", end: "End", mute: "Mute", unmute: "Unmute", captions: "Captions",
-  ended: "Voice ended", conversation: "Voice conversation", turns: (n) => `${n} ${n === 1 ? "turn" : "turns"}`,
-  results: "Results", showTranscript: "Show transcript", hideTranscript: "Hide transcript",
-  autoNote: "Automatic transcript; may differ slightly from what was said.",
-  you: "You", helper: "Helper", source: "Source", loading: "Loading…", needsTap: "Needs your tap", ttfa: "Time to first audio",
-};
+/** Overlay + voice-card strings, from the owner table (English by default). Callers override any of them (a.html passes its own). */
+const VOICE_KEYS = ["connecting", "listening", "thinking", "speaking", "title", "end", "mute", "unmute", "captions", "ended", "conversation",
+  "results", "showTranscript", "hideTranscript", "autoNote", "you", "helper", "source", "loading", "needsTap", "ttfa"];
+export const VOICE_TEXT = Object.defineProperties({ turns: (n) => ot(n === 1 ? "common.voice.turn1" : "common.voice.turnsN", { n }) },
+  Object.fromEntries(VOICE_KEYS.map((k) => [k, { enumerable: true, get: () => ot(`common.voice.${k}`) }])));
 const textsOf = (texts) => ({ ...VOICE_TEXT, ...(typeof texts === "function" ? texts() : texts || {}) });
 const reducedMotion = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
 const CAPTIONS_KEY = "cb.voice.captions";
@@ -391,7 +382,7 @@ export function openVoiceOverlay({ texts, onEnd, onMute } = {}) {
       if (closed || !node) return;
       const panel = h("div", { class: "vo-sheet", role: "dialog", "aria-label": title || T.needsTap },
         h("div", { class: "vo-sheet-head" }, h("b", {}, title || T.needsTap),
-          h("button", { class: "sheet-close", type: "button", "aria-label": "Close", html: ICON.x, onclick: () => { panel.remove(); endBtn.focus(); } })),
+          h("button", { class: "sheet-close", type: "button", "aria-label": ot("common.close"), html: ICON.x, onclick: () => { panel.remove(); endBtn.focus(); } })),
         node);
       sheetSlot.append(panel);
       (panel.querySelector("button.yellow, textarea, button") || panel).focus?.();
@@ -425,7 +416,7 @@ export function voiceCard(summary, { texts, agentId, actionLabel } = {}) {
   results.slice(MAX).forEach((li) => (li.hidden = true));
   const more = results.length > MAX ? h("button", { class: "vc-more", type: "button", "aria-expanded": "false", onclick: () => {
     results.slice(MAX).forEach((li) => (li.hidden = false)); more.remove();
-  } }, `+${results.length - MAX} more`) : null;
+  } }, ot("common.voice.more", { n: results.length - MAX })) : null;
   return h("div", { class: "voice-card", "data-testid": "voice-card", "data-session": summary.sessionId || "" },
     h("div", { class: "vc-head" }, icon("mic"), h("b", {}, T.conversation), h("span", { class: "vc-meta mono" }, `${dur} · ${T.turns(n)}`)),
     results.length ? [h("div", { class: "vc-label" }, T.results), h("ul", { class: "vc-results" }, results), more] : null,
@@ -450,7 +441,7 @@ export function wireVoice({ btn, stateEl, mode, agentId, log, onReply, onEnd, su
     stateEl.hidden = false;
     stateEl.innerHTML = '<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>';
     stateEl.append(h("span", { class: "vs-text" }, text));
-    if (ttfa) stateEl.append(h("span", { class: "ttfa mono", title: "Time to first audio" }, ttfa));
+    if (ttfa) stateEl.append(h("span", { class: "ttfa mono", title: T().ttfa }, ttfa));
   };
   const onMetrics = (m) => {
     const ms = m && (m.ttfaMs ?? m.ttfa ?? m.firstAudioMs);
@@ -479,12 +470,12 @@ export function wireVoice({ btn, stateEl, mode, agentId, log, onReply, onEnd, su
     try { ov?.close(); } catch {}
     const r = run; run = null;
     if (r) { r.mic?.getTracks().forEach((t) => { try { t.stop(); } catch {} }); finish(r); }
-    btn.classList.remove("live"); btn.innerHTML = ICON.mic; btn.setAttribute("aria-label", "Talk"); btn.setAttribute("aria-pressed", "false"); setState("");
+    btn.classList.remove("live"); btn.innerHTML = ICON.mic; btn.setAttribute("aria-label", ot("common.voice.talk")); btn.setAttribute("aria-pressed", "false"); setState("");
   };
   btn.innerHTML = ICON.mic;
   btn.addEventListener("click", async () => {
     if (session || starting || overlay) return stop();
-    btn.classList.add("live"); btn.innerHTML = ICON.stop; btn.setAttribute("aria-label", "Stop talking"); btn.setAttribute("aria-pressed", "true");
+    btn.classList.add("live"); btn.innerHTML = ICON.stop; btn.setAttribute("aria-label", ot("common.voice.stopTalking")); btn.setAttribute("aria-pressed", "true");
     const r = run = { startedAt: Date.now(), turns: [], citations: [], actions: [], replies: [], mic: null, muted: false, done: false, sessionId: "" };
     overlay = openVoiceOverlay({
       texts, onEnd: stop,
@@ -493,7 +484,7 @@ export function wireVoice({ btn, stateEl, mode, agentId, log, onReply, onEnd, su
     setState("connecting");
     let mod;
     try { mod = await import("./voice.js"); }
-    catch { stop(); toast(voiceErr || "Voice isn't available right now. Type your message instead.", "err"); return; }
+    catch { stop(); toast(voiceErr || ot("common.voice.unavailable"), "err"); return; }
     if (run !== r) return; // ended while voice.js was loading
     const ctrl = new AbortController();
     starting = ctrl;
@@ -521,20 +512,20 @@ export function wireVoice({ btn, stateEl, mode, agentId, log, onReply, onEnd, su
           try { onReply?.(json); } catch {}
         },
         onMetrics,
-        onError: (msg) => { if (!live()) return; stop(); toast(msg || "Voice stopped. You can type instead.", "err"); },
+        onError: (msg) => { if (!live()) return; stop(); toast(msg || ot("common.voice.stopped"), "err"); },
       });
       if (!live()) { try { sess?.stop(); } catch {} return; } // cancelled while connecting
       starting = null;
       session = sess;
       r.sessionId = sess?.sessionId || "";
       if (!session) stop();
-    } catch (e) { if (!live()) return; stop(); toast((e && e.message) || voiceErr || "Couldn't start voice. Type your message instead.", "err"); }
+    } catch (e) { if (!live()) return; stop(); toast((e && e.message) || voiceErr || ot("common.voice.startFail"), "err"); }
   });
   return { stop, start: () => { if (!session && !starting && !overlay) btn.click(); }, get active() { return !!(session || starting || overlay); } };
 }
 
 export function scrollToEnd(el) { requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })); }
-export function typingBubble() { return h("div", { class: "msg in typing", "aria-label": "Thinking" }, h("i"), h("i"), h("i")); }
+export function typingBubble() { return h("div", { class: "msg in typing", "aria-label": ot("common.thinking") }, h("i"), h("i"), h("i")); }
 
 
 /* ---------- citations: "Source: title · section" chip -> excerpt sheet ---------- */
@@ -568,7 +559,7 @@ async function openExcerpt(c, agentId, loading) {
       h("div", { class: "label" }, [r.data.section || c.section, r.data.updatedLabel].filter(Boolean).join(" · ")),
       h("div", { class: "quote excerpt" }, r.data.text));
   } else {
-    body.append(h("div", { class: "label" }, "Section"), h("div", { class: "quote" }, c.section || c.title || "—"));
+    body.append(h("div", { class: "label" }, ot("common.section")), h("div", { class: "quote" }, c.section || c.title || "—"));
   }
 }
 
