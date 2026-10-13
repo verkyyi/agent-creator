@@ -4,7 +4,7 @@
 
 > **TL;DR**
 > - A small contractor tells CrewBrain who needs help, by voice, in any language. One card to approve, and a helper goes out by text or QR code.
-> - Every piece of company knowledge carries a lock. Helpers search *as their people* in HydraDB, so locked notes never come back. Proven on real query results and by 69 tests.
+> - Every piece of company knowledge carries a lock. Helpers search *as their people* in HydraDB, so locked notes never come back. Proven on real query results and by 86 tests.
 > - Helpers do real work (log a damage photo, request a walkthrough, draft an update for the homeowner), always with the owner in the loop, and they stop the moment the job closes.
 
 | | |
@@ -38,6 +38,9 @@ Along the way the helpers get work done: Rex files a damage photo to Sam's inbox
 - **Any language.** Answers follow the language people write or speak; the interface follows the phone (17 languages pre-translated, any other on demand).
 - **Fast, grounded answers.** Sources appear in about 0.4 s, answers stream in about 2–3 s, and citations stay one tap away (collapsed by default).
 - **Phone first.** Installable PWA for iPhone and Android, works offline for reading, queues messages until the signal is back.
+- **Text it, too.** Homeowners and crew can text their helper over SMS (photos included) through the same access checks; a built-in SMS simulator shows it without a phone number. Twilio adapter ready ([docs/SMS.md](docs/SMS.md)).
+- **Bring your Google Drive.** Connect a real Drive folder through HydraDB's connector; files arrive locked to Office only until the owner relabels them ([docs/DRIVE.md](docs/DRIVE.md)). Off in the public demo.
+- **Feels like texting a person.** Short multi-bubble replies, "On it" while working, a check reaction when an action is done.
 - **Safe to demo publicly.** Every visitor gets their own sandbox; nothing one visitor does reaches another.
 
 ## Why HydraDB
@@ -63,7 +66,7 @@ phone (PWA, voice) ─▶ server: identity → audience → lifecycle → tool g
 
 ## Access tests
 
-`NODE_ENV=test npx tsx --test test/*.test.ts` (69 tests): create and publish, two distinct helpers, unauthorized document, tenant isolation, audience restriction, close and revocation, real expiry with a test clock, edits need approval, approval integrity, learning and escalation, prompt injection, gated write actions, answers return to the asker, crew-to-homeowner updates, voice tool gating, sandbox isolation, streaming, HydraDB feedback, the agent's tools can't publish, any-language flows.
+`NODE_ENV=test npx tsx --test test/*.test.ts` (86 tests): create and publish, two distinct helpers, unauthorized document, tenant isolation, audience restriction, close and revocation, real expiry with a test clock, edits need approval, approval integrity, learning and escalation, prompt injection, gated write actions, answers return to the asker, crew-to-homeowner updates, voice tool gating, sandbox isolation, streaming, HydraDB feedback, the agent's tools can't publish, any-language flows.
 
 ## Run it
 
