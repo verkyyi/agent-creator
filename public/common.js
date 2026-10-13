@@ -527,6 +527,65 @@ export function wireVoice({ btn, stateEl, mode, agentId, log, onReply, onEnd, su
 export function scrollToEnd(el) { requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })); }
 export function typingBubble() { return h("div", { class: "msg in typing", "aria-label": ot("common.thinking") }, h("i"), h("i"), h("i")); }
 
+/* ---------- texting feel: short consecutive bubbles, a quick ack, reactions, "Seen" ---------- */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A sentence end that's really an abbreviation ("St.", "e.g.") or a list number ("2.") keeps going.
+const ABBR = /(?:^|\s)(?:St|Dr|Mr|Mrs|Ms|Sr|Jr|No|vs|etc|e\.g|i\.e|approx|Ave|Rd|Blvd|Inc|Co|a\.m|p\.m|U\.S|\d+)\.$/i;
+/** Split a reply into up to `max` short texts on line breaks and sentence ends (merging the shortest neighbours). */
+export function splitReply(text, max = 3) {
+  const s = String(text ?? "").trim();
+  if (!s) return [s];
+  const parts = [];
+  for (const line of s.split(/\n+/)) {
+    const l = line.trim();
+    if (!l) continue;
+    let buf = "";
+    for (const seg of l.split(/(?<=[.!?…])\s+|(?<=[。！？])/)) {
+      if (!seg) continue;
+      buf = buf ? `${buf} ${seg}` : seg;
+      if (!ABBR.test(buf)) { parts.push(buf.trim()); buf = ""; }
+    }
+    if (buf) parts.push(buf.trim());
+  }
+  while (parts.length > max) {
+    let best = 0;
+    for (let i = 1; i < parts.length - 1; i++) if (parts[i].length + parts[i + 1].length < parts[best].length + parts[best + 1].length) best = i;
+    parts.splice(best, 2, `${parts[best]} ${parts[best + 1]}`);
+  }
+  return parts.length ? parts : [s];
+}
+/** The pause before the next bubble: ~350-700 ms by length, none with reduced motion. */
+export const bubbleDelay = (text) => (reducedMotion() ? 0 : Math.round(Math.min(700, Math.max(350, 250 + String(text || "").length * 5))));
+/** Show `parts` as consecutive bubbles: `make(part, i, n)` appends one and returns it; typing dots between when animated. */
+export async function textInSequence(container, parts, make, { animate = true, typing = typingBubble } = {}) {
+  const els = [];
+  for (let i = 0; i < parts.length; i++) {
+    const d = animate && i > 0 ? bubbleDelay(parts[i]) : 0;
+    if (d) {
+      const dots = typing(); dots.classList.add("between"); dots.setAttribute("aria-hidden", "true");
+      container.append(dots); scrollToEnd(container);
+      await sleep(d); dots.remove();
+    }
+    const el = make(parts[i], i, parts.length);
+    if (el && i > 0) el.classList.add("cont");
+    if (el) els.push(el);
+    scrollToEnd(container);
+  }
+  return els;
+}
+/** A small check-in-a-circle reaction on a message bubble. */
+export function addReaction(el, label) {
+  if (!el || el.querySelector(":scope > .reaction")) return;
+  el.classList.add("has-reaction");
+  el.append(h("span", { class: "reaction", role: "img", "aria-label": label, title: label, "data-testid": "reaction", html: ICON.checkCircle }));
+}
+/** "Seen" under the sender's latest message (one at a time per chat). */
+export function markSeen(el, label) {
+  if (!el?.isConnected) return;
+  el.parentElement.querySelectorAll(":scope > .seen").forEach((x) => x.remove());
+  el.after(h("div", { class: "seen", "data-testid": "seen" }, label));
+}
+
 
 /* ---------- citations: "Source: title · section" chip -> excerpt sheet ---------- */
 export function citeChip(c, agentId, { prefix = "Source", loading = "Loading…" } = {}) {

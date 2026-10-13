@@ -398,4 +398,24 @@ test("13. Answers return to the asker; creator summarizes and drafts replies", a
   await post(sam, `api/inbox/${draft.inboxId}/answer`, { text: draft.text });
   const hist = (await get(anita, `api/agents/${p.agentId}/history`)).json.messages;
   assert.equal(hist.at(-1).action?.kind, "owner_answer");
+  const asked = hist.filter((m: any) => m.role === "user").at(-1);
+  assert.equal(asked?.reaction, "check", "the delivered owner answer checks the question it answers");
+});
+
+test("Reactions: a write action puts a check on the user's message in history; plain answers don't; approvals check the owner's message", async () => {
+  const sam = await signIn("sam");
+  const marco = await signIn("marco");
+  const rex = await liveRex(sam);
+  const ownerLog = (await get(sam, "api/creator/log")).json.messages;
+  assert.equal(ownerLog.filter((m: any) => m.role === "owner").at(-1)?.reaction, "check", "approving checks the owner's last message");
+
+  const q = await chat(marco, rex, "What's today's schedule?");
+  assert.equal(q.status, 200, q.text);
+  const r = await chat(marco, rex, "found rot on the fascia");
+  assert.equal(r.json.action?.kind, "issue_logged");
+  const hist = (await get(marco, `api/agents/${rex}/history`)).json.messages;
+  const users = hist.filter((m: any) => m.role === "user");
+  assert.equal(users.find((m: any) => m.text === "found rot on the fascia")?.reaction, "check");
+  assert.equal(users.find((m: any) => m.text === "What's today's schedule?")?.reaction, undefined, "no reaction without an action");
+  assert.ok(hist.filter((m: any) => m.role === "helper").every((m: any) => !m.reaction), "only user messages carry reactions");
 });
