@@ -149,6 +149,13 @@ export async function search(tenantId: string, query: string, sources: Source[],
         const text = isDefaultSandbox() ? c.chunk_content : src.sections.find((x) => x.heading === section)?.text ?? "";
         if (text) chunks.push({ sourceId: src.id, title: src.title, section, text, version: src.version, score: c.relevancy_score ?? 0 });
       }
+      // A visitor sandbox may have changed locks or added notes that the shared index doesn't
+      // reflect: fold in the local search under the same rules so nothing allowed goes missing.
+      if (!isDefaultSandbox()) {
+        for (const l of localSearch(query, sources, principals, allowedIds)) {
+          if (!chunks.some((c) => c.sourceId === l.sourceId && c.section === l.section)) chunks.push(l);
+        }
+      }
       if (chunks.length) return { chunks: chunks.slice(0, 4), engine: "hydradb", requestId };
     } catch (e) { console.warn("[hydra] query failed, using local", (e as Error).message); }
   }

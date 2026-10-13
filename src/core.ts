@@ -388,7 +388,9 @@ export function closeAgent(owner: Member, agentId: string) {
     for (const s of db.sources.filter((s) => s.tenantId === a.tenantId && s.sharing === "crew" && s.jobId === c.jobId)) {
       s.sharing = "internal";
       s.updatedAt = now().toISOString();
-      void hydraSetAcl(a.tenantId, s); // takes effect on the next HydraDB query
+      // The HydraDB index is shared by every visitor sandbox: only the default sandbox may
+      // change its ACLs. Sandboxes enforce their own locks in search() (the second check).
+      if (isDefaultSandbox()) void hydraSetAcl(a.tenantId, s); // takes effect on the next HydraDB query
     }
   }
   void forgetAgent(a.tenantId, a.id); // what it remembered about people ends with it
@@ -601,7 +603,7 @@ export function relabel(owner: Member, sid: string, sharing: Sharing) {
   if (!s) throw new HttpError(404, { error: "not_found" });
   s.sharing = sharing;
   s.updatedAt = now().toISOString();
-  void hydraSetAcl(owner.tenantId, s);
+  if (isDefaultSandbox()) void hydraSetAcl(owner.tenantId, s); // shared index: see closeAgent
   record({ tenantId: owner.tenantId, actorId: owner.id, kind: "source.relabel", detail: { id: sid, sharing, acl: aclFor(s) } });
   save();
   return { item: brainItem(s) };
