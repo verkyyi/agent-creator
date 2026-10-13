@@ -1,4 +1,4 @@
-import { api, h, toast, ICON, icon, downscale, lockChip, lockPicker, openSheet, closeSheet, shareSheet, wireVoice, scrollToEnd, typingBubble, originBadge, fmtDate, store } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, openSheet, closeSheet, shareSheet, wireVoice, scrollToEnd, typingBubble, originBadge, fmtDate, store } from "./common.js";
 import { install as installCards, renderCard, relayCard } from "./owner-cards.js";
 
 const $ = (s) => document.querySelector(s);
@@ -9,7 +9,7 @@ document.querySelectorAll("[data-icon]").forEach((el) => (el.outerHTML = ICON[el
 $("#send-btn").innerHTML = ICON.send;
 $("#snap-btn").innerHTML = ICON.cam + "Teach from a photo";
 $("#menu-btn").innerHTML = ICON.menu + '<span class="more-label">More</span><span class="badge" id="more-badge" hidden>0</span>';
-$("#attach-owner-btn").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5l-8.2 8.2a5.2 5.2 0 0 1-7.4-7.4l8.6-8.6a3.5 3.5 0 0 1 5 5l-8.6 8.6a1.8 1.8 0 0 1-2.5-2.5l7.9-7.9"/></svg>';
+$("#attach-owner-btn").innerHTML = ICON.attach;
 $("#attach-photo-btn").innerHTML = ICON.cam + "Photo";
 $("#attach-file-btn").innerHTML = ICON.doc + "File";
 $("#attach-voice-btn").innerHTML = ICON.mic + "Voice note";
@@ -172,7 +172,7 @@ function renderProposal(p) {
   const card = h("div", { class: "approval-card" + (published ? " done" : ""), "data-agent": p.agentId, "data-rev": p.rev });
   card.append(
     h("div", { class: "ac-head" },
-      h("div", { class: "ac-helper" }, h("span", { class: "avatar light" }, p.avatar || "🏡"), h("div", { style: "min-width:0" }, h("h3", {}, p.name), p.job ? h("div", { class: "ac-job" }, p.job) : null)),
+      h("div", { class: "ac-helper" }, avatar(helperAvatar(p)), h("div", { style: "min-width:0" }, h("h3", {}, p.name), p.job ? h("div", { class: "ac-job" }, p.job) : null)),
       published ? h("span", { class: "pill active" }, "Live") : h("span", { class: "pill awaiting" }, "Waiting for your OK")),
     ...(p.changes?.length ? [acRow("What changed", list(p.changes, (c) => c), "ac-changes")] : []),
     acRow("Who can use it", h("span", {}, h("b", {}, p.audience?.name || "Nobody yet"), p.audience ? ` · ${p.audience.count} ${p.audience.count === 1 ? "person" : "people"}` : "")),
@@ -246,7 +246,7 @@ function renderBrain(flashId) {
   for (const it of state.brain) {
     const row = h("button", { class: "brain-item" + (it.id === flashId ? " flash" : ""), type: "button", "data-id": it.id, onclick: () => relabel(it) },
       h("span", { class: "t" }, it.title),
-      h("span", { class: "chev", "aria-hidden": "true" }, "›"),
+      h("span", { class: "chev", "aria-hidden": "true", html: ICON.chevron }),
       h("span", { class: "meta" }, lockChip(it.sharing, it.lockLabel), originBadge(it.origin), it.updatedAt ? h("span", {}, "Updated " + fmtDate(it.updatedAt)) : null),
       it.note ? h("span", { class: "note" }, it.note) : null);
     el.append(row);
@@ -330,7 +330,7 @@ function helperCard(a) {
   const card = h("article", { class: "helper-card" + (ended ? " ended" : ""), "data-id": a.id, "data-state": a.state });
   const actions = h("div", { class: "hc-actions" });
   card.append(
-    h("div", { class: "hc-top" }, h("span", { class: "avatar lg light" }, a.avatar || "🤖"),
+    h("div", { class: "hc-top" }, avatar(helperAvatar(a), "lg"),
       h("div", { style: "min-width:0" }, h("div", { class: "hc-name" }, a.name), h("div", { class: "hc-aud" }, `For ${a.audienceName || "nobody yet"} · ${a.audienceCount ?? 0} ${a.audienceCount === 1 ? "person" : "people"}`)),
       h("span", { class: "pill " + pc }, pt)),
     h("div", { class: "hc-ends" + (ended ? " ended" : "") }, icon("lock"), (ended ? "Ended " : "Shuts off ") + (a.endsLabel || "")),

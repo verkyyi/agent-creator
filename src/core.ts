@@ -142,7 +142,7 @@ function propose(owner: Member, a: Agent, config: AgentConfig, changes?: string[
   const g = groupById(config.audienceGroupId)!;
   const reply = changes?.length
     ? `Here's the change for ${config.name}: ${changes.join("; ")}. Nothing changes until you approve.`
-    : `Here's ${config.name} ${config.avatar}, ${config.tone}. ${p.knows.length} approved sources, only the ${g.name} (${g.memberIds.length} people) can open it, and it ends ${p.endsLabel}. Questions it can't answer come to you. Approve to publish.`;
+    : `Here's ${config.name}, ${config.tone}. ${p.knows.length} approved sources, only the ${g.name} (${g.memberIds.length} people) can open it, and it ends ${p.endsLabel}. Questions it can't answer come to you. Approve to publish.`;
   record({ tenantId: owner.tenantId, actorId: owner.id, agentId: a.id, kind: "agent.proposed", detail: { rev: r.rev } });
   log(owner, "creator", reply, p);
   save();

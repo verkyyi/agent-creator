@@ -19,7 +19,7 @@ A small contractor (Sam, Rivera Solar & Electric) keeps everything the company k
 
 1. **Say who needs help.** "Brief Bay Roofing's crew for the Oak St job until the job closes Friday." The assistant asks only what's missing and shows an approval card: who can use it, what it knows, what it can't see, what it can do, when it ends.
 2. **Approve and send.** Nothing goes live until Sam taps. Each person gets a personal link by text, email or QR code.
-3. **They ask, by voice, in any language.** Juno 🏡 answers the Patel household with sources. Rex 🦺 gives the crew the gate code in Spanish, and logs a damage photo straight to Sam.
+3. **They ask, by voice, in any language.** Juno answers the Patel household with sources. Rex gives the crew the gate code in Spanish, and logs a damage photo straight to Sam.
 4. **Sam stays in the loop.** "What's new?" gets a spoken summary. "Tell Anita yes, after inspection" sends the answer back to her chat and saves it as company knowledge, only after Sam approves.
 5. **The job closes, access ends.** "Close Rex" → open chats stop, and the site brief with the gate code locks back to Office only.
 
@@ -37,9 +37,9 @@ Everything happens in **one conversation, by voice or text**. The Brain, Helpers
 - **App:** Node 22 + TypeScript (Hono), mobile-first installable PWA with offline shell and outbox, served from a Mac mini behind Tailscale Funnel.
 
 ```
-phone (PWA, voice) ─▶ server: identity → audience → lifecycle → tool gate ─▶ HydraDB (search as audience)
-                                   │                                         └▶ Claude (answer + cite)
-                                   └▶ gpt-realtime (voice, via the same gated tools)
+phone (PWA, voice) ─> server: identity → audience → lifecycle → tool gate ─> HydraDB (search as audience)
+                                   │                                         └> Claude (answer + cite)
+                                   └> gpt-realtime (voice, via the same gated tools)
 ```
 
 ## Access tests

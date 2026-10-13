@@ -1,4 +1,4 @@
-import { api, h, toast, ICON, icon, downscale, wireVoice, scrollToEnd, typingBubble, citeChip, store } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, avatarKey, svgIcon, downscale, wireVoice, scrollToEnd, typingBubble, citeChip, store } from "./common.js";
 
 const $ = (s) => document.querySelector(s);
 const id = new URLSearchParams(location.search).get("id");
@@ -121,7 +121,7 @@ async function loadPublic(first) {
   if (!r.ok) { if (first) showScreen(t().notFound, r.data.error || t().notFoundText, { power: false }); return false; }
   info = r.data;
   if (first) {
-    isCrew = info.avatar === "🦺" || /crew|roof|brief/i.test(`${info.name} ${info.job} ${info.tone || ""}`);
+    isCrew = avatarKey(info.avatar) === "hardhat" || /crew|roof|brief/i.test(`${info.name} ${info.job} ${info.tone || ""}`);
     document.body.classList.toggle("crew", isCrew);
     if (isCrew) $("#composer").insertBefore($("#attach-btn"), $("#voice-state"));
     applyLang();
@@ -130,9 +130,14 @@ async function loadPublic(first) {
   return true;
 }
 
+/** The helper's avatar key; old sandboxes may hold an emoji or nothing, so fall back by audience. */
+const avKey = () => avatarKey(info?.avatar) || (isCrew ? "hardhat" : "house");
+
 function renderHeader() {
   document.title = `${info.name} · ${info.tenantName || "Crewbrain"}`;
-  $("#h-avatar").textContent = info.avatar || "🏡";
+  const hk = avKey();
+  const hav = $("#h-avatar");
+  hav.className = `avatar lg av-${hk}`; hav.dataset.avatar = hk; hav.innerHTML = svgIcon(hk);
   $("#h-name").textContent = info.name;
   $("#h-sub").textContent = [info.tenantName, info.job].filter(Boolean).join(" · ");
   $("#h-ends-text").textContent = `${t().ends} ${info.endsLabel || ""}`;
@@ -190,7 +195,7 @@ function showWelcome() {
   const w = h("div", { class: "welcome", role: "dialog", "aria-modal": "true", "aria-labelledby": "welcome-hi", "data-testid": "welcome" },
     h("div", { class: "welcome-card" },
       langSw,
-      h("div", { class: "avatar xl" }, info.avatar || "🏡"),
+      avatar(avKey(), "xl"),
       h("h1", { id: "welcome-hi" }, meName ? s.hi(meName, helper, company) : s.hiAnon(helper, company)),
       info.job ? h("p", {}, s.helpsWith(info.job.replace(/[.\s]+$/, "").replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase()))) : null,
       info.endsLabel ? h("p", { class: "welcome-ends" }, icon("lock"), s.worksUntil(info.endsLabel)) : null,
@@ -212,7 +217,7 @@ function hideStarters() { startersShown = false; $("#starters").hidden = true; }
 
 function intro() {
   chat.append(h("div", { class: "chat-intro" },
-    h("div", { class: "avatar lg" }, info.avatar || "🏡"),
+    avatar(avKey(), "lg"),
     h("b", {}, info.name),
     h("span", {}, `${info.tenantName || ""}${info.job ? " · " + info.job : ""}`)));
 }

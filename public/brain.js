@@ -118,7 +118,7 @@ export async function renderBrain(el, opts = {}) {
       list.append(h("button", { class: "brain-item" + (it.id === flashId ? " flash" : ""), type: "button", "data-id": it.id, onclick: () => openItem(it) },
         h("span", { class: "bx-ic", html: icon }),
         h("span", { class: "t" }, it.title),
-        h("span", { class: "chev", "aria-hidden": "true" }, "›"),
+        h("span", { class: "chev", "aria-hidden": "true", html: common.ICON.chevron }),
         h("span", { class: "meta" }, lockChip(it.sharing, it.lockLabel), h("span", {}, words), h("span", {}, `Updated ${fmtDate(it.updatedAt)}`))));
     }
   }
