@@ -19,9 +19,16 @@ When a chat is refused, `reply` holds the sentence to show/speak.
 
 ## Owner
 
-- `POST api/creator/message` `{ text }` → `{ reply: string, proposal?: Proposal, agent?: AgentSummary }`
-  The creator asks only for missing info. When complete it returns a `proposal` (state `awaiting_approval`).
-  Edits ("make Rex less formal", "extend Juno to Friday", "close the Oak St job") also come back as a proposal or a done reply.
+- `POST api/creator/message` `{ text }` → `{ reply: string, proposal?: Proposal, agent?: AgentSummary, replyDraft?: { inboxId, to, via, text }, card?: Card, cards?: Card[] }`
+  The creator is a tool-using model (`src/creator.ts`; `CREATOR_ENGINE=claude|openai|auto`, auto = Claude Sonnet via the
+  Agent SDK, OpenAI `OPENAI_FAST_MODEL ?? gpt-4.1-mini` on error or after 10 s). Each message it gets a short system prompt,
+  the company context, the last 12 creator-log turns and tools: `get_context`, `propose_helper`, `propose_edit`,
+  `close_helper`, `change_lock`, `share_links`, `show_helpers`, `whats_new`, `draft_reply`, `remember_note`, `ask_brain`,
+  `job_status`. It replies in the owner's language. Tools only PROPOSE: a proposal is `awaiting_approval` until
+  `POST api/agents/:id/approve`; close and lock changes come back as `confirm` cards; replies as `replyDraft`.
+  The server picks sources (template × owner scope × allowed locks × job) and validates audience and end time (future).
+  `card` is the first card; `cards` is present when there are several. Offline (tests, no keys) a deterministic keyword
+  fallback answers.
 - `GET api/creator/log` → `{ messages: { role: "owner"|"creator", text, at, proposal?: Proposal }[] }`
 - `POST api/agents/:id/approve` `{ rev }` → `{ agent: AgentSummary, links: { memberId, name, url }[] }`
   `url` is an absolute personal link for that audience member.
@@ -65,6 +72,7 @@ type AgentSummary = {
 };
 type Proposal = {
   agentId: string; rev: number; name: string; avatar: string; tone: string; job: string;
+  summary?: string;                              // one sentence in the owner's language (model-written)
   audience: { groupId: string; name: string; count: number };
   knows: { id: string; title: string; version: number }[];
   canCheck: { tool: string; name: string }[];   // read tools

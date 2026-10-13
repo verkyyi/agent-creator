@@ -44,6 +44,8 @@ export const db: DB = new Proxy({} as DB, {
   getOwnPropertyDescriptor: (_, k) => ({ ...Reflect.getOwnPropertyDescriptor(current().db, k), configurable: true }),
 });
 export const sandboxId = () => current().id;
+/** The sandbox this code runs in; capture it to re-enter later (`inSandbox`) from a callback that lost the request context. */
+export const currentSandbox = (): Sandbox => current();
 export const isDefaultSandbox = () => current() === legacy;
 
 const fileOf = (id: string) => join(SANDBOX_DIR(), `${id}.json`);
