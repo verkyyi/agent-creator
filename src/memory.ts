@@ -2,6 +2,8 @@
 // inside their company's database, so one person's preferences never reach another person.
 // A module-level mirror keeps it working offline and in tests (not persisted; fine for the demo).
 
+import { isDefaultSandbox, sandboxId } from "./store.ts";
+
 const BASE = "https://api.hydradb.com";
 const key = () => process.env.HYDRA_DB_API_KEY;
 export const dbName = (tenantId: string) => `crewbrain_${tenantId}`;
@@ -22,7 +24,10 @@ export const hydraOn = () => !!key();
 interface Mem { id: string; agentId: string; text: string; at: string; hydraId?: string }
 const mirror = new Map<string, Mem[]>(); // key: tenantId/memberId
 
-const k = (t: string, m: string) => `${t}/${m}`;
+// Memories belong to a sandbox: the local mirror is keyed by it, and HydraDB's per-member
+// collections (shared by every sandbox) are used only by the default one.
+const k = (t: string, m: string) => `${t}/${sandboxId()}:${m}`;
+const hydraMem = () => !!key() && isDefaultSandbox();
 let seq = 0;
 
 export function remember(tenantId: string, memberId: string, agentId: string, text: string) {
@@ -34,7 +39,7 @@ export function remember(tenantId: string, memberId: string, agentId: string, te
   // Locally keep only distilled preferences, de-duplicated, so recall() stays small.
   if (pref && !list.some((x) => x.text === pref)) list.push(mem);
   mirror.set(k(tenantId, memberId), list.slice(-20));
-  if (!key()) return;
+  if (!hydraMem()) return;
   const form = new FormData();
   form.set("type", "memory");
   form.set("database", dbName(tenantId));
@@ -47,7 +52,7 @@ export function remember(tenantId: string, memberId: string, agentId: string, te
 
 export async function recall(tenantId: string, memberId: string): Promise<string[]> {
   const local = (mirror.get(k(tenantId, memberId)) ?? []).map((m) => m.text);
-  if (!key()) return local;
+  if (!hydraMem()) return local;
   try {
     const d = await hydraCall("/query", { json: { database: dbName(tenantId), collection: coll(memberId), query: "How does this person like answers? Language, length, preferences.", type: "memory", max_results: 5 } }, 4000);
     const got = ((d?.chunks ?? []) as any[]).map((c) => String(c.chunk_content ?? "").trim()).filter(Boolean);
@@ -62,7 +67,7 @@ export async function forget(tenantId: string, memberId: string, agentId: string
   const list = mirror.get(k(tenantId, memberId)) ?? [];
   const gone = list.filter((m) => m.agentId === agentId);
   mirror.set(k(tenantId, memberId), list.filter((m) => m.agentId !== agentId));
-  if (!key() || !gone.length) return;
+  if (!hydraMem() || !gone.length) return;
   try {
     await hydraCall("/context", { method: "DELETE", json: { database: dbName(tenantId), collection: coll(memberId), ids: gone.map((m) => m.hydraId ?? m.id), type: "memory" } });
   } catch (e) { console.warn("[memory] forget", (e as Error).message); }
@@ -70,7 +75,8 @@ export async function forget(tenantId: string, memberId: string, agentId: string
 
 /** Forget every member's memories made through one helper (call when the helper is closed). */
 export async function forgetAgent(tenantId: string, agentId: string) {
-  const ids = [...mirror.keys()].filter((x) => x.startsWith(`${tenantId}/`)).map((x) => x.slice(tenantId.length + 1));
+  const pre = k(tenantId, "");
+  const ids = [...mirror.keys()].filter((x) => x.startsWith(pre)).map((x) => x.slice(pre.length));
   await Promise.all(ids.map((mid) => forget(tenantId, mid, agentId)));
 }
 

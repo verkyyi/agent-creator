@@ -170,6 +170,8 @@ export interface DB {
   drafts: Record<string, CreatorDraft>; // keyed by owner member id
   creatorLog: Record<string, { role: "owner" | "creator"; text: string; at: string }[]>;
   clockOffsetMs: number;
+  // invite token per member id (random per sandbox; see store.ts)
+  inviteTokens?: Record<string, string>;
   // tool fixture data, keyed by tenant
   toolData: Record<string, Record<string, unknown>>;
 }

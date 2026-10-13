@@ -1,4 +1,5 @@
 import type { Group, Sharing, Source } from "./types.ts";
+import { isDefaultSandbox } from "./store.ts";
 
 // Retrieval runs AS THE AUDIENCE. Each source carries an access list (HydraDB `acl`)
 // derived from its lock; a helper searches with its audience's principals only, so a
@@ -73,8 +74,11 @@ function docText(s: Source) {
   return s.sections.map((x) => `## ${x.heading}\n${x.text}`).join("\n\n");
 }
 
+// The HydraDB index is shared by every sandbox and holds the seed only: a visitor's
+// edits stay in their sandbox (writes from a sandbox are skipped, and search answers
+// with the sandbox's own text, using HydraDB only to rank).
 export async function hydraIngest(tenantId: string, sources: Source[]) {
-  if (!key() || !sources.length) return;
+  if (!key() || !sources.length || !isDefaultSandbox()) return;
   const form = new FormData();
   form.set("type", "knowledge");
   form.set("database", dbName(tenantId));
@@ -88,7 +92,7 @@ export async function hydraIngest(tenantId: string, sources: Source[]) {
 }
 
 export async function hydraSetAcl(tenantId: string, s: Source) {
-  if (!key() || hydraState[tenantId] === "off" || hydraState[tenantId] === "error") return;
+  if (!key() || !isDefaultSandbox() || hydraState[tenantId] === "off" || hydraState[tenantId] === "error") return;
   try {
     await hydra(`/context/${encodeURIComponent(s.id)}/metadata`, { method: "PATCH", json: { database: dbName(tenantId), collection: COLLECTION, acl: aclFor(s) } });
   } catch (e) { console.warn("[hydra] acl update failed", (e as Error).message); }
@@ -132,7 +136,9 @@ export async function search(tenantId: string, query: string, sources: Source[],
       for (const c of d?.chunks ?? []) {
         const src = allowed.find((s) => s.id === (c.id ?? c.source_id)); // second check: approved scope + current lock
         if (!src || !aclAllows(aclFor(src), principals)) continue;
-        chunks.push({ sourceId: src.id, title: src.title, section: sectionOf(src, c.chunk_content), text: c.chunk_content, version: src.version, score: c.relevancy_score ?? 0 });
+        const section = sectionOf(src, c.chunk_content);
+        const text = isDefaultSandbox() ? c.chunk_content : src.sections.find((x) => x.heading === section)?.text ?? "";
+        if (text) chunks.push({ sourceId: src.id, title: src.title, section, text, version: src.version, score: c.relevancy_score ?? 0 });
       }
       if (chunks.length) return { chunks: chunks.slice(0, 4), engine: "hydradb" };
     } catch (e) { console.warn("[hydra] query failed, using local", (e as Error).message); }
