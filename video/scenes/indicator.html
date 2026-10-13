@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Highlight indicator</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* Transparent full-frame overlay: the "1 · 2 · 3" highlight progress, top right (above the phone). */
+html, body { background: transparent !important; background-image: none !important; }
+.ind { position: absolute; right: 142px; top: 14px; display: flex; align-items: center; gap: 10px; font-family: var(--f-mono); font-weight: 700; font-size: 20px; color: var(--muted); }
+.ind span.d { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line); background: var(--paper); }
+.ind span.d.done { border-color: var(--ink); color: var(--ink); }
+.ind span.d.on { background: var(--tag); border-color: var(--ink); color: var(--tag-ink); }
+.ind .sep { color: var(--line); }
+.ind .t { margin-right: 6px; letter-spacing: .08em; text-transform: uppercase; font-size: 16px; }
+</style></head>
+<body>
+<div class="ind" id="ind"><span class="t">Highlight</span></div>
+<script>
+const n = Number(new URLSearchParams(location.search).get("n") || 1);
+const el = document.getElementById("ind");
+[1, 2, 3].forEach((i) => {
+  if (i > 1) el.insertAdjacentHTML("beforeend", '<span class="sep">·</span>');
+  el.insertAdjacentHTML("beforeend", `<span class="d ${i === n ? "on" : i < n ? "done" : ""}">${i}</span>`);
+});
+</script>
+</body></html>

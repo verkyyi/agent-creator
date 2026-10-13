@@ -1,152 +1,300 @@
 {
-  "title": "Crewbrain — demo",
+  "title": "Crewbrain — demo v3",
   "voice": "cedar",
-  "ttsInstructions": "Speak like a calm, confident product founder walking a colleague through a live demo. Plain and warm, measured pace, no hype. Leave a short natural pause between sentences.",
-  "url": "https://macmini.tail435588.ts.net:10000/crewbrain/",
+  "ttsInstructions": "Speak like a calm, confident product founder showing a colleague something that works. Plain, warm and direct, a brisk but unhurried pace, no hype. Short natural pauses between sentences.",
+  "ownerVoice": {
+    "text": "Brief Bay Roofing's crew for the Oak Street job, until the job closes Friday at six.",
+    "voice": "ash",
+    "instructions": "A busy solar contractor talking into his phone on a job site. Casual, clear, quick, one breath."
+  },
+  "url": "https://macmini.tail435588.ts.net:10000/crewbrain/demo.html",
   "repo": "github.com/verkyyi/agent-creator",
   "segments": [
     {
-      "id": 1,
-      "name": "opening",
-      "duration": 27,
+      "id": "hook",
       "visual": {
         "type": "scene",
-        "scene": "opening"
+        "scene": "hook"
       },
-      "kicker": "A day at 42 Oak St",
-      "headline": "",
-      "caption": "",
-      "narration": "Meet Sam. Every job depends on what's in his head, and what's on his phone. Here's the same question, asked of two helpers. The homeowner's helper says it can't share crew details. The crew's helper answers, in Spanish. Crewbrain turns company knowledge into voice helpers, with the right access, only for as long as it's needed."
+      "minLen": 6.5,
+      "narration": "Meet Sam. He runs a small solar company, and every job depends on what's in his head, and on his phone."
     },
     {
-      "id": 2,
-      "name": "brain",
-      "duration": 29,
+      "id": "split",
+      "visual": {
+        "type": "split",
+        "left": {
+          "raw": "open-juno"
+        },
+        "right": {
+          "raw": "open-rex"
+        }
+      },
+      "narration": "Same question, two helpers. The homeowner's helper declines. The crew's helper answers, in Spanish."
+    },
+    {
+      "id": "title",
+      "visual": {
+        "type": "scene",
+        "scene": "titlecard"
+      },
+      "minLen": 11,
+      "narration": "Crewbrain turns what's in the owner's head into voice helpers. Say one sentence to create one. They only see what they should. And they switch off when the job is done."
+    },
+    {
+      "id": "h1-mic",
+      "highlight": 1,
       "visual": {
         "type": "app",
-        "persona": "owner",
-        "flow": "brain",
-        "raws": [
-          "seg-3"
-        ]
+        "raw": "h1-voice",
+        "from": "start",
+        "to": "speech"
       },
-      "kicker": "1 · One company brain · Powered by HydraDB",
-      "headline": "Snap it. Approve it. Lock it.",
-      "caption": "Every item keeps its source and its lock.",
-      "narration": "It starts with Sam's company brain, powered by HydraDB. Everything happens in one conversation, by voice or text. He snaps the warranty card from a SunPeak panel. Claude drafts a knowledge item, and Sam approves it with a tap, locked to homeowners. It sits in the brain with its source, next to the crew brief, and the office-only price book."
+      "kicker": "1 · Say it, get a helper",
+      "headline": "One sentence.",
+      "caption": "Sam taps the mic and just says what he needs.",
+      "narration": "Highlight one: say it, get a helper. Sam taps the mic, and says one sentence."
     },
     {
-      "id": 3,
-      "name": "create",
-      "duration": 36,
+      "id": "h1-say",
+      "highlight": 1,
+      "audio": "owner-voice",
       "visual": {
         "type": "app",
-        "persona": "owner",
-        "flow": "create",
-        "raws": [
-          "seg-4"
-        ]
+        "raw": "h1-voice",
+        "from": "speech",
+        "to": "sheet"
       },
-      "kicker": "2 · Make a helper",
-      "headline": "Say the job. Approve the card.",
-      "caption": "The creator asks only what's missing.",
-      "narration": "Next, Sam asks for a helper for the Patels, about their install at forty-two Oak Street. The creator asks only for what's missing, like when their access should end. Thirty days after handover. Then the approval card: who it's for, what it knows, what it can do, and when it ends. One tap, and Juno is live. Links go out by text, email, or QR. Rex, for Bay Roofing's crew, takes ten seconds more."
+      "kicker": "1 · Say it, get a helper",
+      "headline": "One sentence.",
+      "caption": "Spoken, not typed. Live voice.",
+      "narration": "“Brief Bay Roofing's crew for the Oak Street job, until the job closes Friday at six.”"
     },
     {
-      "id": 4,
-      "name": "work",
-      "duration": 38,
+      "id": "h1-card",
+      "highlight": 1,
       "visual": {
         "type": "app",
-        "persona": "customer",
-        "flow": "use",
-        "raws": [
-          "seg-5-a-juno",
-          "seg-5-b-rex",
-          "seg-5-inbox"
-        ]
+        "raw": "h1-voice",
+        "from": "sheet",
+        "to": "approve"
       },
-      "kicker": "3 · Helpers at work",
-      "headline": "Answers with sources. Real actions.",
-      "caption": "Juno cites the warranty. Rex answers in Spanish and logs damage.",
-      "narration": "Anita Patel opens Juno, and asks what her warranty covers. Juno answers from the approved card, with the source right there. On the roof, Marco picks Spanish and asks Rex by voice. Rex answers in Spanish. Then Marco snaps a photo of a cracked flashing. Rex logs the issue, and it lands in Sam's inbox, with the photo, the note, who sent it, and when."
+      "kicker": "1 · Say it, get a helper",
+      "headline": "One card to approve.",
+      "caption": "Who it's for, what it knows, what it can do, when it ends.",
+      "narration": "Crewbrain heard who it's for, which job, and when it ends. Claude works out the rest: what the crew may know, what Rex can do, and what it can't see, like the price book. It all fits on one card, and nothing goes live until Sam approves."
     },
     {
-      "id": 5,
-      "name": "escalate",
-      "duration": 22,
+      "id": "h1-share",
+      "highlight": 1,
       "visual": {
         "type": "app",
-        "persona": "mixed",
-        "flow": "use",
-        "raws": [
-          "seg-5-c-owner",
-          "seg-5-d-anita"
-        ]
+        "raw": "h1-voice",
+        "from": "approve",
+        "to": "end"
       },
-      "kicker": "4 · The brain grows",
-      "headline": "Questions go to Sam. Answers come back.",
-      "caption": "Sam answers once. It becomes knowledge.",
-      "narration": "When Juno can't answer, the question goes to Sam. He asks what's new, and replies in one line. The answer goes straight back to Anita, and it's saved as new knowledge, so the brain keeps getting better."
+      "kicker": "1 · Say it, get a helper",
+      "headline": "Live. Send the link.",
+      "caption": "Each roofer gets a personal link, by text or QR code.",
+      "narration": "One tap, and Rex is live. Each roofer gets a personal link, by text, or as a QR code on site. No setup screens, no settings."
     },
     {
-      "id": 6,
-      "name": "proof",
-      "duration": 18,
+      "id": "h2-proof",
+      "highlight": 2,
       "visual": {
         "type": "scene",
         "scene": "proof"
       },
-      "kicker": "5 · Prove the locks",
-      "headline": "",
-      "caption": "",
-      "narration": "Now the proof. Here is the same HydraDB query, run as two audiences. The crew sees the site brief. The household never does. And the price book doesn't come back for either."
+      "minLen": 16,
+      "narration": "Highlight two: helpers only see what they should. The company brain runs on HydraDB, and every source carries an access list. Here is one real query, run as the household and as the crew. The crew gets the site brief. The household never does. And the price book comes back for neither."
     },
     {
-      "id": 7,
-      "name": "locks",
-      "duration": 30,
+      "id": "h2-rex",
+      "highlight": 2,
       "visual": {
         "type": "app",
-        "persona": "mixed",
-        "flow": "locks",
-        "raws": [
-          "seg-6-a-juno",
-          "seg-6-b-other",
-          "seg-6-c-owner",
-          "seg-6-d-crew"
-        ]
+        "raw": "h2-rex"
       },
-      "kicker": "5 · Prove the locks",
-      "headline": "Close the job. Access ends.",
-      "caption": "Another company sees nothing. Closing a job ends every link.",
-      "narration": "In the app, Juno declines the crew code. Another company on the same server sees nothing of Rivera's. And when the roof is done, Sam says: close Rex. He confirms. Marco asks Rex again, and the helper has ended. The site brief goes back to office only."
+      "kicker": "2 · Only what they should see",
+      "headline": "Answers, with the source.",
+      "caption": "Rex answers the crew in Spanish and shows where it came from.",
+      "narration": "On the roof, Marco asks Rex in Spanish where to park, and what the safety rules are. Rex answers in Spanish, and shows the sources it used: the site brief, and the crew's safety rules."
     },
     {
-      "id": 8,
-      "name": "how",
-      "duration": 26,
+      "id": "h2-juno",
+      "highlight": 2,
+      "visual": {
+        "type": "app",
+        "raw": "h2-juno"
+      },
+      "kicker": "2 · Only what they should see",
+      "headline": "Crew details stay with the crew.",
+      "caption": "Warranty: answered. Gate code: never retrieved.",
+      "narration": "Anita's helper, Juno, answers her warranty question, with its source. But the site brief is locked to the crew. So when she asks for the gate code, Juno never retrieves it, and can't share it."
+    },
+    {
+      "id": "w-photo",
+      "visual": {
+        "type": "app",
+        "raw": "w-rex-photo"
+      },
+      "kicker": "It also gets work done",
+      "headline": "Photo report.",
+      "caption": "Marco snaps it. Rex files it.",
+      "narration": "Helpers also get work done. Marco snaps a photo of cracked flashing, and Rex files a report."
+    },
+    {
+      "id": "w-inbox",
+      "visual": {
+        "type": "app",
+        "raw": "w-inbox"
+      },
+      "kicker": "It also gets work done",
+      "headline": "Straight to Sam's inbox.",
+      "caption": "Photo, note, who sent it, and when.",
+      "narration": "It lands in Sam's inbox, with the photo, the note, and who sent it."
+    },
+    {
+      "id": "w-relay",
+      "visual": {
+        "type": "app",
+        "raw": "w-rex-relay"
+      },
+      "kicker": "It also gets work done",
+      "headline": "Updates go through Sam.",
+      "caption": "Rex drafts it. Sam approves it.",
+      "narration": "Then Marco asks Rex to tell the Patels the dumpster comes at seven thirty. Rex drafts the update, and sends it to Sam first."
+    },
+    {
+      "id": "w-approve",
+      "visual": {
+        "type": "app",
+        "raw": "w-owner-relay"
+      },
+      "kicker": "It also gets work done",
+      "headline": "One tap to approve.",
+      "caption": "Nothing reaches the homeowner until Sam says so.",
+      "narration": "Sam checks it, and approves with a tap."
+    },
+    {
+      "id": "w-update",
+      "visual": {
+        "type": "app",
+        "raw": "w-anita-update"
+      },
+      "kicker": "It also gets work done",
+      "headline": "The homeowner hears it.",
+      "caption": "An update from Rivera Solar & Electric.",
+      "narration": "Anita's helper shows the update, from Rivera Solar and Electric."
+    },
+    {
+      "id": "w-ask",
+      "visual": {
+        "type": "app",
+        "raw": "w-juno-ask"
+      },
+      "kicker": "It also gets work done",
+      "headline": "Unknown? Ask Sam.",
+      "caption": "Questions the brain can't answer go to the owner.",
+      "narration": "When Juno doesn't know, like whether they can add an EV charger, the question goes to Sam."
+    },
+    {
+      "id": "w-answer",
+      "visual": {
+        "type": "app",
+        "raw": "w-owner-answer"
+      },
+      "kicker": "It also gets work done",
+      "headline": "Answer once. The brain learns.",
+      "caption": "Sam's reply goes to Anita and into the brain.",
+      "narration": "Sam answers in one line. Anita gets the reply, and the brain improves, so next time Juno already knows."
+    },
+    {
+      "id": "c-close",
+      "highlight": 3,
+      "climax": true,
+      "visual": {
+        "type": "app",
+        "raw": "c-owner",
+        "from": "start",
+        "to": "tap"
+      },
+      "kicker": "3 · Access ends with the job",
+      "headline": "Close Rex.",
+      "caption": "The roof is done. Rex is still live.",
+      "narration": "Highlight three: access ends with the job. On Friday the roof is done. Sam says: close Rex."
+    },
+    {
+      "id": "c-confirm",
+      "highlight": 3,
+      "climax": true,
+      "hold": 0.9,
+      "visual": {
+        "type": "app",
+        "raw": "c-owner",
+        "from": "tap",
+        "to": "done"
+      },
+      "kicker": "3 · Access ends with the job",
+      "headline": "One tap.",
+      "caption": "The crew loses access right away.",
+      "narration": "He confirms."
+    },
+    {
+      "id": "c-ended",
+      "highlight": 3,
+      "climax": true,
+      "hold": 0.9,
+      "visual": {
+        "type": "app",
+        "raw": "c-crew"
+      },
+      "kicker": "3 · Access ends with the job",
+      "headline": "This helper has ended.",
+      "caption": "Marco asks again. The chat stops on the spot.",
+      "narration": "On the roof, Marco's chat is still open. He starts another question, and it stops: this helper has ended."
+    },
+    {
+      "id": "c-brain",
+      "highlight": 3,
+      "climax": true,
+      "visual": {
+        "type": "app",
+        "raw": "c-owner",
+        "from": "brain",
+        "to": "end"
+      },
+      "kicker": "3 · Access ends with the job",
+      "headline": "Back to office only.",
+      "caption": "The site brief and its gate code are locked again.",
+      "narration": "And the site brief, with the gate code, goes back to office only. Access ended with the job."
+    },
+    {
+      "id": "how",
       "visual": {
         "type": "scene",
         "scene": "how"
       },
-      "kicker": "How it works",
-      "headline": "",
-      "caption": "",
-      "narration": "Under the hood, every request passes server policy checks first. HydraDB is the permissioned knowledge: one database per company, an access list on every source, and search that runs as the audience. Claude does the reasoning and takes the actions. And OpenAI's gpt-realtime gives everyone a live voice."
+      "minLen": 9,
+      "narration": "Under the hood: HydraDB holds the knowledge and the permissions. Claude does the reasoning and the actions. Realtime voice lets anyone just talk."
     },
     {
-      "id": 9,
-      "name": "close",
-      "duration": 18,
+      "id": "tests",
+      "visual": {
+        "type": "scene",
+        "scene": "terminal"
+      },
+      "minLen": 3.5,
+      "narration": "And the whole test suite passes."
+    },
+    {
+      "id": "close",
       "visual": {
         "type": "scene",
         "scene": "closing"
       },
-      "kicker": "Crewbrain",
-      "headline": "",
-      "caption": "",
-      "narration": "Sam's phone is quieter now. We're inviting small contractors to the pilot. Crewbrain: your company's know-how, on every job, with the right access, for the right amount of time."
+      "minLen": 7.0,
+      "narration": "Crewbrain. Your company's know-how, on every job, with the right access, for the right amount of time."
     }
   ]
 }

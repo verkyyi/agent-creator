@@ -1,0 +1,28 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Three highlights</title>
+<link rel="stylesheet" href="base.css">
+<script src="../out/scene-icons.js"></script>
+<style>
+.head { position: absolute; left: 120px; top: 170px; right: 120px; }
+.head .line { font-size: 44px; font-weight: 700; line-height: 1.25; max-width: 34ch; margin-top: 22px; }
+.mark { display: flex; align-items: center; gap: 30px; }
+.mark .m { width: 96px; height: 96px; border: 9px solid var(--ink); border-radius: 50%; display: grid; place-items: center; }
+.mark .m::after { content: ""; width: 30px; height: 30px; background: var(--tag); border-radius: 50%; border: 6px solid var(--ink); }
+.mark h1 { font-size: 150px; }
+.hl { position: absolute; left: 120px; right: 120px; top: 560px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; }
+.h { background: var(--sheet); border: 3px solid var(--ink); border-radius: 16px; padding: 26px 30px 30px; box-shadow: 8px 8px 0 rgba(20,24,31,.12); }
+.h .n { font-family: var(--f-mono); font-weight: 700; font-size: 24px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+.h .n i { font-size: 54px; color: var(--chalk); }
+.h h2 { font-size: 64px; margin-top: 18px; line-height: .95; }
+</style></head>
+<body class="drift">
+<div class="head">
+  <div class="mark pop" style="animation-delay:.1s"><div class="m"></div><h1>Crewbrain</h1></div>
+  <div class="line up" style="animation-delay:.7s">What's in the owner's head, turned into voice helpers.</div>
+</div>
+<div class="hl">
+  <div class="h up" style="animation-delay:3.7s"><div class="n">1<i data-i="mic"></i></div><h2>Say it, get a helper</h2></div>
+  <div class="h up" style="animation-delay:6.1s"><div class="n">2<i data-i="lock"></i></div><h2>Only what they should see</h2></div>
+  <div class="h up" style="animation-delay:8.3s"><div class="n">3<i data-i="clock"></i></div><h2>Access ends with the job</h2></div>
+</div>
+</body></html>

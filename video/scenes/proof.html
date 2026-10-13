@@ -1,34 +1,49 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>HydraDB proof</title>
 <link rel="stylesheet" href="base.css">
+<script src="../out/scene-icons.js"></script>
 <script src="../out/hydra-proof.js"></script>
 <style>
-.head { position: absolute; left: 120px; right: 120px; top: 160px; }
-h2 { font-size: 84px; margin-top: 16px; }
-.q { font-family: var(--f-mono); font-size: 26px; margin-top: 18px; color: var(--muted); }
+/* Real results: out/hydra-proof.json, written by video/hydra-proof.mjs (same query, two audiences, live HydraDB). */
+.head { position: absolute; left: 120px; right: 120px; top: 150px; }
+h2 { font-size: 92px; margin-top: 16px; }
+.acl-row { display: flex; gap: 14px; margin-top: 26px; flex-wrap: wrap; align-items: center; }
+.acl-row .k { font-family: var(--f-mono); font-size: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-right: 6px; }
+.src { display: inline-flex; gap: 10px; align-items: center; background: var(--sheet); border: 2px solid var(--ink); border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 24px; }
+.src .lock { font-size: 17px; padding: 4px 8px; }
+.q { font-family: var(--f-mono); font-size: 24px; margin-top: 26px; color: var(--muted); }
 .q b { color: var(--ink); }
-.cols { position: absolute; left: 120px; right: 120px; top: 440px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
-.col { background: var(--sheet); border: 3px solid var(--ink); border-radius: 14px; padding: 26px 30px; }
-.col h3 { font-family: var(--f-display); font-weight: 800; font-size: 46px; text-transform: uppercase; margin: 0 0 6px; }
-.acl { font-family: var(--f-mono); font-size: 17px; color: var(--muted); margin-bottom: 16px; }
-.r { font-size: 30px; font-weight: 700; padding: 10px 0; border-top: 1px solid var(--line); }
+.cols { position: absolute; left: 120px; right: 120px; top: 560px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+.col { background: var(--sheet); border: 3px solid var(--ink); border-radius: 14px; padding: 22px 30px; }
+.col h3 { font-family: var(--f-display); font-weight: 800; font-size: 46px; text-transform: uppercase; margin: 0 0 4px; display: flex; gap: 14px; align-items: center; }
+.acl { font-family: var(--f-mono); font-size: 16px; color: var(--muted); margin-bottom: 10px; }
+.r { font-size: 27px; font-weight: 700; padding: 7px 0; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
 .r.hit { color: var(--chalk); }
-.none { font-family: var(--f-mono); font-size: 22px; color: var(--deny); margin-top: 14px; }
+@keyframes glow { 0%,100% { background: transparent; } 50% { background: var(--chalk-soft); } }
+.r.hit { animation: glow 1.2s ease 2; animation-delay: 12.3s; border-radius: 6px; }
+.none { font-family: var(--f-mono); font-size: 22px; color: var(--deny); margin-top: 10px; display: flex; gap: 10px; align-items: center; }
 </style></head>
-<body>
-<div class="topbar"><div class="brand"><span class="brand-mark"></span>Crewbrain</div><div class="label">Real HydraDB query results</div></div>
-<div class="head"><span class="tag up"><span class="hole"></span>Same query · two audiences</span>
+<body class="drift">
+<div class="topbar"><div class="brand"><span class="brand-mark"></span>Crewbrain</div></div>
+<div class="head"><span class="tag up"><span class="hole"></span>Powered by HydraDB</span>
   <h2 class="up" style="animation-delay:.3s">Search runs as the audience</h2>
-  <div class="q up" style="animation-delay:.6s">POST /query · db <b id="db"></b> · "<b id="query"></b>"</div></div>
+  <div class="acl-row up" style="animation-delay:4.2s"><span class="k">Every source has an access list</span>
+    <span class="src">Site Brief: 42 Oak St <span class="lock crew"><i data-i="lock"></i>Crew · 42 Oak St</span></span>
+    <span class="src">Care &amp; Warranty <span class="lock home"><i data-i="lock"></i>Homeowners</span></span>
+    <span class="src">Price Book 2026 <span class="lock office"><i data-i="lock"></i>Office only</span></span></div>
+  <div class="q up" style="animation-delay:8.4s">POST /query · db <b id="db"></b> · "<b id="query"></b>"</div></div>
 <div class="cols">
-  <div class="col up" style="animation-delay:1.5s"><h3>🏡 Household</h3><div class="acl" id="acl-h"></div><div id="res-h"></div><div class="none">✗ Site brief · ✗ Price book</div></div>
-  <div class="col up" style="animation-delay:3s"><h3>🦺 Crew</h3><div class="acl" id="acl-c"></div><div id="res-c"></div><div class="none">✗ Price book</div></div>
+  <div class="col up" style="animation-delay:9.6s"><h3><i data-i="house"></i>Household</h3><div class="acl" id="acl-h"></div><div id="res-h"></div>
+    <div class="none in" style="animation-delay:13.6s"><i data-i="close"></i>No site brief · no price book</div></div>
+  <div class="col up" style="animation-delay:10.4s"><h3><i data-i="hardhat"></i>Crew</h3><div class="acl" id="acl-c"></div><div id="res-c"></div>
+    <div class="none in" style="animation-delay:15.2s"><i data-i="close"></i>No price book</div></div>
 </div>
 <script>
 const P = window.PROOF || { results: { household: { acl: [], titles: [] }, crew: { acl: [], titles: [] } } };
 document.getElementById("db").textContent = P.database; document.getElementById("query").textContent = P.query;
+const esc = (t) => String(t).replace(/[&<]/g, (c) => (c === "&" ? "&amp;" : "&lt;"));
 const fill = (k, id) => { const r = P.results[k]; document.getElementById("acl-" + id).textContent = "acl: " + r.acl.join(", ");
-  document.getElementById("res-" + id).innerHTML = r.titles.map((t) => `<div class="r ${/brief/i.test(t) ? "hit" : ""}">${t.replace(/</g, "&lt;")}</div>`).join(""); };
+  document.getElementById("res-" + id).innerHTML = r.titles.slice(0, 5).map((t) => `<div class="r ${/brief/i.test(t) ? "hit" : ""}">${/brief/i.test(t) ? '<i data-i="check"></i>' : ""}${esc(t)}</div>`).join(""); };
 fill("household", "h"); fill("crew", "c");
 </script>
 </body></html>

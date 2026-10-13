@@ -7,10 +7,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const DIR = dirname(fileURLToPath(import.meta.url));
 export const OUT = join(DIR, "out");
 export const W = 1920, H = 1080, FPS = 30;
-export const XFADE = 0.6;          // crossfade between segments (s)
-export const LEAD = 0.5;           // narration starts this long after a segment begins
-export const TAIL = 1.0;           // breathing room after narration ends
-export const MAX_TOTAL = 300;      // hard cap: 5:00
+// Pacing (data-driven; see README): every segment is its narration + TAIL, plus any deliberate `hold`.
+export const XFADE = 0.3;          // crossfade between segments (s)
+export const LEAD = 0.15;          // narration starts this long after a segment begins
+export const TAIL = 0.3;           // after the narration ends
+export const MAX_GAP = 1.0;        // longest stretch without narration (the climax `hold` may reach 1.5)
 // Phone placement on the 1920x1080 canvas (must match scenes/card.html .shadow and phone-frame.html)
 export const PHONE = { x: 1314, y: 64, w: 464, h: 967, screen: { x: 1330, y: 80, w: 432, h: 935 } };
 
@@ -20,27 +21,18 @@ export function probeDuration(file) {
   return Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { encoding: "utf8" }).trim());
 }
 
-/** Segment lengths: at least the slot, at least narration+lead+tail; then squeeze slack so total <= MAX_TOTAL. */
-export function timeline(script) {
-  const durFile = join(OUT, "audio", "durations.json");
-  const dur = existsSync(durFile) ? JSON.parse(readFileSync(durFile, "utf8")) : {};
-  const segs = script.segments.map((s) => {
-    const audio = dur[s.id] ?? probeIf(join(OUT, "audio", `seg-${s.id}.mp3`)) ?? 0;
-    const min = audio + LEAD + TAIL + XFADE;
-    return { ...s, audio, len: Math.max(s.duration, min), min };
-  });
-  const total = () => segs.reduce((a, s) => a + s.len, 0) - XFADE * (segs.length - 1);
-  let over = total() - MAX_TOTAL;
-  while (over > 0.01) {
-    const slack = segs.filter((s) => s.len - s.min > 0.05);
-    if (!slack.length) { console.warn(`timeline: narration alone exceeds ${MAX_TOTAL}s by ${over.toFixed(1)}s`); break; }
-    const cut = Math.min(over / slack.length, ...slack.map((s) => s.len - s.min));
-    for (const s of slack) s.len -= cut;
-    over = total() - MAX_TOTAL;
-  }
+/** Narration length per segment (trimmed audio, see compose.mjs) -> start/len for every segment. */
+export function timeline(script, audioLen) {
   let t = 0;
-  for (const s of segs) { s.len = Math.round(s.len * FPS) / FPS; s.start = t; t += s.len - XFADE; }
-  return { segs, total: total() };
+  const segs = script.segments.map((s) => {
+    const audio = audioLen(s);
+    const need = LEAD + audio + TAIL + Math.min(s.hold || 0, 1.5 - LEAD - TAIL) + XFADE;
+    const len = Math.round(Math.max(need, (s.minLen || 0) + XFADE) * FPS) / FPS;
+    const seg = { ...s, audio, len, start: t };
+    t += len - XFADE;
+    return seg;
+  });
+  return { segs, total: t + XFADE };
 }
 function probeIf(f) { try { return existsSync(f) ? probeDuration(f) : null; } catch { return null; } }
 

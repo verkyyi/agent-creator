@@ -1,0 +1,29 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Test run</title>
+<link rel="stylesheet" href="base.css">
+<script src="../out/tests-run.js"></script>
+<style>
+/* Real output: out/tests-run.json, written by video/tests-proof.mjs (runs the suite, captures stdout). */
+.term { position: absolute; left: 200px; right: 200px; top: 120px; bottom: 150px; background: #0b0e12; border-radius: 18px; box-shadow: 0 40px 80px -30px rgba(10,20,40,.55); overflow: hidden; }
+.bar { height: 52px; background: #1b2028; display: flex; align-items: center; gap: 10px; padding: 0 20px; }
+.bar b { width: 15px; height: 15px; border-radius: 50%; background: #3b4450; }
+.bar span { margin-left: 16px; font-family: var(--f-mono); color: #9aa5b3; font-size: 18px; }
+pre { margin: 0; padding: 26px 34px; font-family: var(--f-mono); font-size: 25px; line-height: 1.42; color: #c9d1db; white-space: pre-wrap; }
+.p { color: #f5c400; } .ok { color: #6fd39c; } .sum { color: #fff; font-weight: 700; } .dim { color: #6b7684; }
+.ln { opacity: 0; animation: in .05s linear forwards; }
+</style></head>
+<body class="drift">
+<div class="term">
+  <div class="bar"><b></b><b></b><b></b><span id="title"></span></div>
+  <pre id="out"></pre>
+</div>
+<script>
+const T = window.TESTS || { command: "", tail: [], summary: [] };
+document.getElementById("title").textContent = `agent-creator @ ${T.commit || ""} · ${T.at ? T.at.slice(0, 16).replace("T", " ") + " UTC" : ""}`;
+const esc = (s) => String(s).replace(/[&<]/g, (c) => (c === "&" ? "&amp;" : "&lt;"));
+const lines = [`<span class="p">$</span> ${esc(T.command)}`, `<span class="dim">…</span>`,
+  ...T.tail.map((l) => `<span class="${/^ok/.test(l) ? "ok" : ""}">${esc(l.length > 92 ? l.slice(0, 91) + "…" : l)}</span>`),
+  ...T.summary.filter((l) => /# (tests|pass|fail) /.test(l)).map((l) => `<span class="sum">${esc(l)}</span>`)];
+document.getElementById("out").innerHTML = lines.map((l, i) => `<div class="ln" style="animation-delay:${(0.15 + i * 0.11).toFixed(2)}s">${l}</div>`).join("");
+</script>
+</body></html>

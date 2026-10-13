@@ -16,9 +16,15 @@ for (const [k, acl] of Object.entries(audiences)) {
     body: JSON.stringify({ database: "crewbrain_rivera", collection: "brain", query, type: "knowledge", query_by: "hybrid", mode: "fast", max_results: 8, graph_context: false, acl }) });
   const j = await r.json().catch(() => ({}));
   const d = j?.data ?? j;
-  const titles = [];
-  for (const c of d?.chunks ?? []) { const t = c.title || c.source_title || c.metadata?.title || c.id || c.source_id; if (t && !titles.includes(t)) titles.push(t); }
-  out.results[k] = { acl, status: r.status, titles };
+  const titles = [], other = [];
+  for (const c of d?.chunks ?? []) {
+    const t = c.title || c.source_title || c.metadata?.title || c.id || c.source_id;
+    // The shared index also holds items visitors saved on the public demo (random src_<hex> ids); the scene shows the company's own sources.
+    const visitor = /^src_[0-9a-f]{10}$/.test(String(c.id ?? c.source_id ?? ""));
+    const list = visitor ? other : titles;
+    if (t && !list.includes(t)) list.push(t);
+  }
+  out.results[k] = { acl, status: r.status, titles, visitorItems: other.length };
   console.log(k, r.status, titles);
   if (!titles.length) console.log(JSON.stringify(j).slice(0, 600));
 }

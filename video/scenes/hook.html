@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Hook</title>
+<link rel="stylesheet" href="base.css">
+<script src="../out/scene-icons.js"></script>
+<style>
+.left { position: absolute; left: 120px; top: 250px; width: 760px; }
+.left h1 { font-size: 190px; }
+.left .who { font-size: 40px; font-weight: 700; color: var(--muted); margin-top: 26px; }
+.left .site { margin-top: 44px; }
+.notes { position: absolute; right: 120px; top: 190px; width: 820px; display: grid; gap: 26px; }
+.note { background: var(--sheet); border: 2px solid var(--ink); border-radius: 22px; padding: 22px 28px; box-shadow: 8px 8px 0 rgba(20,24,31,.12);
+  display: grid; grid-template-columns: 72px 1fr; gap: 22px; align-items: center; }
+.note .ico { width: 72px; height: 72px; border-radius: 18px; display: grid; place-items: center; font-size: 40px; background: var(--chalk-soft); color: var(--chalk); }
+.note .ico.home { background: #dff2e7; color: var(--ok); }
+.note .from { font-family: var(--f-mono); font-size: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.note .txt { font-size: 40px; font-weight: 700; margin-top: 4px; }
+@keyframes buzz { 0%,100% { transform: none; } 20% { transform: translateX(-6px) rotate(-.4deg); } 40% { transform: translateX(6px) rotate(.4deg); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+.note.pop { animation: pop .5s cubic-bezier(.2,.7,.2,1) forwards, buzz .35s ease 2; }
+.count { position: absolute; right: 120px; top: 880px; font-family: var(--f-mono); font-weight: 700; font-size: 26px; color: var(--deny); }
+</style></head>
+<body class="drift">
+<div class="topbar in"><div class="brand"><span class="brand-mark"></span>Crewbrain</div><div class="label">A day at 42 Oak St</div></div>
+<div class="left">
+  <h1 class="up" style="animation-delay:.2s">Meet Sam.</h1>
+  <div class="who up" style="animation-delay:.6s">Owner, Rivera Solar &amp; Electric</div>
+  <div class="site up" style="animation-delay:2.4s"><span class="tag"><span class="hole"></span>Job: 42 Oak St</span></div>
+</div>
+<div class="notes">
+  <div class="note pop" style="animation-delay:.9s,.9s"><div class="ico"><i data-i="hardhat"></i></div><div><div class="from">Bay Roofing · now</div><div class="txt">"Where should we park?"</div></div></div>
+  <div class="note pop" style="animation-delay:1.9s,1.9s"><div class="ico home"><i data-i="house"></i></div><div><div class="from">Anita Patel · now</div><div class="txt">"What does the warranty cover?"</div></div></div>
+  <div class="note pop" style="animation-delay:2.9s,2.9s"><div class="ico"><i data-i="hardhat"></i></div><div><div class="from">Marco · now</div><div class="txt">"Found damage. Who do I tell?"</div></div></div>
+</div>
+<div class="count in" style="animation-delay:4.2s">3 interruptions · 9:04 AM</div>
+</body></html>

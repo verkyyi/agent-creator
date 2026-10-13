@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Generate narration per segment with OpenAI TTS, plus the Spanish fake-mic question.
-// Usage: node video/tts.mjs [--only=1,3] [--force] [--test]
+// Usage: node video/tts.mjs [--only=hook,split] [--force] [--test]   (only changed lines are regenerated)
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -12,7 +12,9 @@ mkdirSync(OUT, { recursive: true });
 const args = process.argv.slice(2);
 const force = args.includes("--force");
 const test = args.includes("--test");
-const only = (args.find((a) => a.startsWith("--only=")) || "").slice(7).split(",").filter(Boolean).map(Number);
+const only = (args.find((a) => a.startsWith("--only=")) || "").slice(7).split(",").filter(Boolean);
+import { createHash } from "node:crypto";
+const hash = (s) => createHash("sha1").update(s).digest("hex").slice(0, 12);
 
 function apiKey() {
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
@@ -58,21 +60,44 @@ if (test) {
   process.exit(0);
 }
 
+// durations.json: { "<id>": seconds, ..., "_hash": { "<id>": sha1(voice+instructions+text) } } — a changed line is regenerated.
 const durations = {};
 const durFile = join(OUT, "durations.json");
 if (existsSync(durFile)) Object.assign(durations, JSON.parse(readFileSync(durFile, "utf8")));
+const hashes = (durations._hash ??= {});
+
+// Sam's own spoken sentence (Highlight 1): an mp3 for the soundtrack + a padded 48k WAV for Chromium's fake mic.
+const ov = script.ownerVoice;
+if (ov) {
+  const mp3 = join(OUT, "owner-voice.mp3"), wav = join(OUT, "owner-voice.wav");
+  const h = hash(ov.voice + ov.instructions + ov.text);
+  if (force || !existsSync(mp3) || hashes["owner-voice"] !== h) {
+    await tts({ text: ov.text, voice: ov.voice, instructions: ov.instructions, format: "mp3", file: mp3 });
+    hashes["owner-voice"] = h;
+  }
+  // 5 s of silence first: the realtime session needs a moment to connect before Sam "speaks"; 4 s after for the VAD.
+  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", mp3, "-af", "adelay=5000,apad=pad_dur=4", "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", wav]);
+  durations["owner-voice"] = probeDuration(mp3);
+  console.log(`owner-voice ${durations["owner-voice"].toFixed(2)}s`);
+}
 
 await Promise.all(
   script.segments
-    .filter((s) => !only.length || only.includes(s.id))
+    .filter((s) => !only.length || only.includes(String(s.id)))
     .map(async (s) => {
+      if (s.audio) { // a segment voiced by a recorded line instead of the narrator
+        durations[s.id] = durations[s.audio] ?? probeDuration(join(OUT, `${s.audio}.mp3`));
+        console.log(`seg-${s.id} (uses ${s.audio}) ${durations[s.id].toFixed(2)}s`);
+        return;
+      }
       const f = join(OUT, `seg-${s.id}.mp3`);
-      if (force || !existsSync(f)) {
+      const h = hash(voice + script.ttsInstructions + s.narration);
+      if (force || !existsSync(f) || hashes[s.id] !== h) {
         await tts({ text: s.narration, voice, instructions: script.ttsInstructions, format: "mp3", file: f });
+        hashes[s.id] = h;
       }
       durations[s.id] = probeDuration(f);
-      const flag = durations[s.id] > s.duration - 0.5 ? "  <-- LONGER THAN SLOT" : "";
-      console.log(`seg-${s.id} ${s.name.padEnd(8)} narration ${durations[s.id].toFixed(2)}s / slot ${s.duration}s${flag}`);
+      console.log(`seg-${String(s.id).padEnd(10)} narration ${durations[s.id].toFixed(2)}s`);
     })
 );
 writeFileSync(durFile, JSON.stringify(durations, null, 2));
@@ -92,5 +117,5 @@ if (force || !existsSync(esWav)) {
   execFileSync("ffmpeg", ["-y", "-v", "error", "-i", esMp3, "-af", "adelay=1000,apad=pad_dur=3", "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", esWav]);
 }
 console.log(`es-question.wav ${probeDuration(esWav).toFixed(2)}s`);
-const total = Object.values(durations).reduce((a, b) => a + b, 0);
+const total = script.segments.reduce((a, s) => a + (durations[s.id] || 0), 0);
 console.log(`total narration ${total.toFixed(1)}s`);

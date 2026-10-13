@@ -1,26 +1,29 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Closing</title>
 <link rel="stylesheet" href="base.css">
+<script src="../out/closing.js"></script>
 <style>
-.center { position: absolute; left: 120px; right: 120px; top: 150px; bottom: 170px; display: grid; align-content: center; justify-items: start; gap: 30px; }
+.center { position: absolute; left: 120px; right: 120px; top: 130px; bottom: 150px; display: grid; align-content: center; justify-items: start; gap: 30px; }
 .mark { width: 120px; height: 120px; border: 10px solid var(--ink); border-radius: 50%; display: grid; place-items: center; }
 .mark::after { content: ""; width: 38px; height: 38px; background: var(--tag); border-radius: 50%; border: 7px solid var(--ink); }
-h1 { font-size: 230px; line-height: .82; }
-.tagline { font-size: 46px; font-weight: 700; max-width: 30ch; line-height: 1.2; }
-.links { display: grid; gap: 14px; margin-top: 16px; }
-.url { font-family: var(--f-mono); font-weight: 700; font-size: 38px; color: var(--chalk); }
-.repo { font-family: var(--f-mono); font-size: 32px; }
-.stack { font-family: var(--f-mono); font-size: 22px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+h1 { font-size: 220px; line-height: .82; }
+.tagline { font-size: 50px; font-weight: 700; max-width: 26ch; line-height: 1.18; }
+.url { font-family: var(--f-mono); font-weight: 700; font-size: 32px; color: var(--chalk); }
+.repo { font-family: var(--f-mono); font-size: 26px; color: var(--muted); }
+.qr { position: absolute; right: 0; top: calc(50% - 200px); width: 400px; text-align: center; }
+.qr img { width: 400px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; display: block; }
+.qr .label { margin-top: 14px; }
 </style></head>
-<body>
+<body class="drift">
 <div class="center">
   <div style="display:flex;align-items:center;gap:40px" class="pop"><div class="mark"></div><h1>Crewbrain</h1></div>
-  <div class="tagline up" style="animation-delay:.9s">Your company’s know-how, on every job — with the right access, for the right amount of time.</div>
-  <div class="links up" style="animation-delay:6.5s">
-    <div class="url">https://macmini.tail435588.ts.net:10000/crewbrain/</div>
-    <div class="repo">github.com/verkyyi/agent-creator</div>
-  </div>
-  <div class="stack in" style="animation-delay:8s">Pilot invite · small trade contractors · HydraDB · Claude · OpenAI gpt-realtime</div>
-  <img src="../assets/qr.png" class="pop" style="position:absolute;right:0;top:calc(50% - 180px);width:360px;border:3px solid var(--ink);border-radius:12px;animation-delay:6.5s">
+  <div class="tagline up" style="animation-delay:1.3s">Your company’s know-how, on every job, with the right access, for the right amount of time.</div>
+  <div class="up" style="animation-delay:.6s;display:grid;gap:10px"><div class="url" id="url"></div><div class="repo" id="repo"></div></div>
+  <div class="qr pop" style="animation-delay:.6s"><img id="qr" alt=""><div class="label">Try the demo</div></div>
 </div>
+<script>
+const C = window.CLOSING || {};
+document.getElementById("url").textContent = C.url || ""; document.getElementById("repo").textContent = C.repo || "";
+document.getElementById("qr").src = C.qr || "";
+</script>
 </body></html>

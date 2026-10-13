@@ -1,101 +1,71 @@
 #!/usr/bin/env node
-// Drive the REAL Crewbrain app in a phone viewport and record one webm per segment/persona into video/out/raw/.
-// Usage: BASE=http://127.0.0.1:8787/ node video/record.mjs [--only=3,4,5,6] [--placeholder]
-//   --placeholder  record the public landing page as stand-in footage (raw/placeholder.webm) — no app needed.
+// Drive the REAL Crewbrain app in a phone viewport and record one webm per shot into video/out/raw/.
+// Each shot also writes raw/<name>.json: { marks: { name: seconds }, cuts: [[from, to], ...] }.
+// `marks` are story beats compose.mjs can split a take on; `cuts` are waits (server, network, polling)
+// that compose removes, so the cut never shows anybody waiting.
+//
+// Usage: BASE=http://127.0.0.1:8787/ node video/record.mjs [--only=h1,main] [--typed]
+//   h1     Highlight 1: Sam creates a helper with one spoken sentence in the full-screen voice overlay
+//          (Chromium fake mic plays out/audio/owner-voice.wav). --typed: the typed fallback.
+//   main   everything else, in one sandbox: opening split, Highlight 2, the work section, the Close-job climax.
 import { chromium } from "playwright";
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DIR, OUT, launch, renderPng } from "./lib.mjs";
 
 const BASE = (process.env.BASE || "http://127.0.0.1:8787/").replace(/\/?$/, "/");
-const RAW = join(OUT, "raw"), TMP = join(RAW, "_tmp");
-mkdirSync(TMP, { recursive: true });
+const RAW = join(OUT, "raw"), TMP = join(RAW, "_tmp"), SHOTS = join(OUT, "rec-shots");
+for (const d of [TMP, SHOTS]) mkdirSync(d, { recursive: true });
 const args = process.argv.slice(2);
-const only = (args.find((a) => a.startsWith("--only=")) || "").slice(7).split(",").filter(Boolean).map(Number);
+const only = (args.find((a) => a.startsWith("--only=")) || "").slice(7).split(",").filter(Boolean);
 const want = (n) => !only.length || only.includes(n);
-const STATE = join(RAW, "state.json");
-const state = existsSync(STATE) ? JSON.parse(readFileSync(STATE, "utf8")) : {};
-const saveState = () => writeFileSync(STATE, JSON.stringify(state, null, 2));
-const trims = {};
+const typed = args.includes("--typed");
+const script = JSON.parse(readFileSync(join(DIR, "script.json"), "utf8"));
 
 const VIEW = { width: 390, height: 844 };
 const ctxOpts = { viewport: VIEW, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "en-US", recordVideo: { dir: TMP, size: { width: 390, height: 844 } } };
 const log = (...a) => console.log(`[${new Date().toISOString().slice(11, 19)}]`, ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let failures = 0;
 
 async function step(name, fn) {
-  try { log("→", name); return await fn(); } catch (e) { log("✗", name, "—", String(e.message || e).split("\n")[0]); return undefined; }
+  try { log("→", name); return await fn(); } catch (e) { failures++; log("✗", name, "—", String(e.message || e).split("\n")[0]); return undefined; }
 }
-/** Start a recorded context; returns { page, finish(name) } which saves raw/<name>.webm */
-async function recorded(browser, extra = {}) {
-  const t0 = Date.now();
+
+/** A recorded browser context. mark()/wait() keep the timing sidecar that compose.mjs reads. */
+async function recorded(browser, { init = {}, extra = {} } = {}) {
   const ctx = await browser.newContext({ ...ctxOpts, ...extra });
+  await ctx.addInitScript((kv) => { try { for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v); } catch {} }, init);
   const page = await ctx.newPage();
+  const t0 = Date.now(); // the screencast starts with the first page
   page.setDefaultTimeout(20000);
+  const marks = {}, cuts = [];
+  const now = () => (Date.now() - t0) / 1000;
   return {
-    ctx, page, t0,
+    ctx, page, now,
+    mark(name, t = now()) { marks[name] = t; log("  mark", name, marks[name].toFixed(2)); },
+    /** Await something slow; the wait is cut except `head` s at its start and `tail` s at its end. */
+    async wait(p, { head = 0.5, tail = 0.35 } = {}) {
+      const a = now();
+      try { return await p; } finally { const b = now(); if (b - a > head + tail + 0.2) cuts.push([+(a + head).toFixed(3), +(b - tail).toFixed(3)]); }
+    },
+    cut(a, b) { if (b - a > 0.2) cuts.push([+a.toFixed(3), +b.toFixed(3)]); },
+    async shot(n) { await page.screenshot({ path: join(SHOTS, `${n}.png`) }).catch(() => {}); },
     async finish(name) {
+      marks.start ??= 0; marks.end = now();
       const video = page.video();
       await ctx.close();
       const src = video && (await video.path());
-      if (src && existsSync(src)) { const dst = join(RAW, `${name}.webm`); renameSync(src, dst); log("saved", dst); }
+      if (src && existsSync(src)) {
+        renameSync(src, join(RAW, `${name}.webm`));
+        writeFileSync(join(RAW, `${name}.json`), JSON.stringify({ marks, cuts }, null, 2));
+        log("saved", name, `(${marks.end.toFixed(1)}s, ${cuts.length} cuts, -${cuts.reduce((s, [a, b]) => s + b - a, 0).toFixed(1)}s)`);
+      }
     },
   };
 }
-async function type(page, sel, text) {
-  const el = page.locator(sel).first();
-  await el.waitFor({ state: "visible", timeout: 15000 });
-  await el.click();
-  await el.fill("");
-  await el.pressSequentially(text, { delay: 38 + Math.round(Math.random() * 20) });
-  await sleep(350);
-}
-async function send(page, text, urlPart) {
-  await type(page, "#composer-input", text);
-  const resp = page.waitForResponse((r) => r.url().includes(urlPart) && r.request().method() === "POST", { timeout: 90000 }).catch(() => null);
-  await page.locator("#send-btn").first().click();
-  const r = await resp;
-  let body = null;
-  try { body = r ? await r.json() : null; } catch {}
-  await sleep(1800); // let the reply render and be read
-  return body;
-}
-async function gentleScroll(page, px = 600, steps = 12) {
-  for (let i = 0; i < steps; i++) { await page.mouse.wheel(0, px / steps); await sleep(60); }
-}
-async function pickFile(page, triggerSel, inputSel, file) {
-  const chooser = page.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
-  await page.locator(triggerSel).first().click().catch(() => {});
-  const fc = await chooser;
-  if (fc) await fc.setFiles(file);
-  else await page.locator(inputSel).first().setInputFiles(file);
-}
 
-// ---------------- placeholder mode ----------------
-if (args.includes("--placeholder")) {
-  const browser = await launch(chromium);
-  const r = await recorded(browser);
-  await r.page.goto("https://verkyyi.github.io/agent-creator/", { waitUntil: "networkidle" }).catch(() => {});
-  await sleep(2500);
-  for (let i = 0; i < 10; i++) { await gentleScroll(r.page, 500, 20); await sleep(1200); }
-  await r.finish("placeholder");
-  await browser.close();
-  rmSync(TMP, { recursive: true, force: true });
-  process.exit(0);
-}
-
-// ---------------- assets ----------------
-const warranty = join(DIR, "assets", "warranty-card.png");
-const flashing = join(DIR, "assets", "flashing.png");
-const esWav = join(OUT, "audio", "es-question.wav");
-{
-  const b = await launch(chromium);
-  if (!existsSync(warranty)) await renderPng(b, join(DIR, "assets", "warranty-card.html"), warranty, { width: 1200, height: 900 });
-  if (!existsSync(flashing)) await renderPng(b, join(DIR, "assets", "flashing.html"), flashing, { width: 900, height: 1200 });
-  await b.close();
-}
-
-// ---------------- identities ----------------
+// ---------------- app helpers ----------------
 async function identities() {
   for (let i = 0; i < 30; i++) {
     try {
@@ -107,332 +77,385 @@ async function identities() {
   }
   throw new Error(`app not reachable at ${BASE}`);
 }
-const abs = (u) => (u ? new URL(u, BASE).href : u);
-let ids = await identities();
-log("identities:", ids.map((i) => `${i.name} (${i.role})`).join(", "));
-const find = (pred) => ids.find(pred);
-const owner = find((i) => i.role === "owner" && /sam|rivera/i.test(i.name)) || find((i) => i.role === "owner");
-const otherOwner = ids.find((i) => i.role === "owner" && i !== owner);
-const homeownerId = () => find((i) => /patel|homeowner/i.test(`${i.name} ${i.role}`));
-const crewId = () => find((i) => /bay|crew|roof/i.test(`${i.name} ${i.role}`) && i.role !== "owner");
+const abs = (u) => new URL(u, BASE).href;
+const who = (ids, re) => ids.find((i) => re.test(i.name));
 
-if (args.includes("--reset")) {
-  const b0 = await launch(chromium); const c0 = await b0.newContext(); const p0 = await c0.newPage();
-  await p0.goto(abs(owner.url)).catch(() => {});
-  const rr = await c0.request.post(BASE + "api/reset", { data: {} }).catch((e) => ({ status: () => e.message }));
-  log("reset:", rr.status()); await b0.close();
+/** Fill (no per-character typing) and send; wait for the creator's JSON reply (cut) and its render. */
+async function ownerSay(r, text, { typeDelay = 0 } = {}) {
+  const { page } = r;
+  await closeSheets(page);
+  const input = page.locator("#composer-input");
+  await input.click();
+  if (typeDelay) await input.pressSequentially(text, { delay: typeDelay }); else await input.fill(text);
+  await sleep(450);
+  const resp = page.waitForResponse((x) => x.url().includes("api/creator/message") && x.request().method() === "POST", { timeout: 90000 });
+  await page.locator("#send-btn").click();
+  const res = await r.wait(resp.catch(() => null), { head: 0.7 });
+  await sleep(500);
+  try { return res ? await res.json() : null; } catch { return null; }
 }
-const browser = await launch(chromium);
-const voiceBrowser = await launch(chromium, {
-  args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", `--use-file-for-fake-audio-capture=${esWav}%noloop`],
-});
-
-async function ownerPage() {
-  const r = await recorded(browser);
-  await r.page.goto(abs(owner.url), { waitUntil: "domcontentloaded" });
-  await r.page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-  await sleep(1200);
-  return r;
-}
-/** Converse with the creator until an approval card shows; answer follow-ups from the reply text. */
-async function createHelper(page, prompt, answers) {
-  let body = await send(page, prompt, "api/creator/message");
-  for (let turn = 0; turn < 4; turn++) {
-    if (body?.proposal || (await page.locator(".approval-card").count())) break;
-    const reply = (body?.reply || "").toLowerCase();
-    log("creator asked:", reply.slice(0, 140));
-    const a = answers.find(([re]) => re.test(reply))?.[1] || answers.at(-1)[1];
-    body = await send(page, a, "api/creator/message");
+/** Helper chat (streaming): fill, send, wait until the helper's message is in the chat. */
+async function helperSay(r, text, { photo, typeDelay = 22 } = {}) {
+  const { page } = r;
+  const sel = "#chat > .msg.in:not(.pending):not(.typing), #chat > .owner-update, #chat > .owner-answer, #chat > .action-chip";
+  const before = await page.locator(sel).count();
+  if (photo) {
+    const fc = page.waitForEvent("filechooser", { timeout: 4000 }).catch(() => null);
+    await page.locator("#attach-btn").click();
+    const chooser = await fc;
+    if (chooser) await chooser.setFiles(photo); else await page.locator("#attach-input").setInputFiles(photo);
+    await sleep(700);
   }
-  const card = page.locator(".approval-card").last();
-  await card.waitFor({ state: "visible", timeout: 30000 });
-  await card.scrollIntoViewIfNeeded();
-  await sleep(1500);
-  // slow pan over the card so viewers can read it
-  const box = await card.boundingBox();
-  if (box && box.height > 600) await gentleScroll(page, Math.min(box.height - 500, 700), 25);
-  await sleep(2500);
-  const approved = page.waitForResponse((r) => /api\/agents\/[^/]+\/approve/.test(r.url()), { timeout: 30000 }).catch(() => null);
-  const btn = card.locator("#approve-btn");
-  await ((await btn.count()) ? btn : page.locator("#approve-btn").last()).click();
-  const r = await approved;
-  let res = null;
-  try { res = r ? await r.json() : null; } catch {}
-  await step("share sheet", async () => { await page.locator(".share-sheet").first().waitFor({ state: "visible", timeout: 10000 }); await sleep(3500); });
-  await step("dismiss share sheet", async () => {
-    const close = page.locator(".sheet-close, .share-sheet [aria-label='Close']").first();
-    if (await close.count()) await close.click(); else await page.keyboard.press("Escape");
-    await sleep(800);
-  });
-  return res;
+  const input = page.locator("#composer-input");
+  await input.click();
+  await input.pressSequentially(text, { delay: typeDelay }); // very fast typing: motion, not a wait
+  await sleep(300);
+  await page.locator("#send-btn").click();
+  // Keep the first ~1.2 s ("Checking your notes…", the sources found) and the arrival; cut the rest.
+  await r.wait(page.waitForFunction(([s, n]) => document.querySelectorAll(s).length > n && !document.querySelector("#chat .pending, #chat .typing"), [sel, before], { timeout: 60000 }).catch(() => null), { head: 1.2, tail: 0.2 });
+  await sleep(300);
 }
-
-// ---------------- chat-first helpers ----------------
-async function skipOnboarding(page, showMs = 0) {
-  const ob = page.locator("[data-testid=onboarding]");
-  if (await ob.isVisible().catch(() => false)) {
-    await sleep(showMs);
-    await page.locator("#ob-skip").click().catch(() => page.getByRole("button", { name: /skip|start/i }).first().click());
-    await sleep(800);
+async function closeSheets(page) {
+  for (let i = 0; i < 3; i++) {
+    const c = page.locator(".onsite-close:visible, .sheet-close:visible").first();
+    if (!(await c.count())) break;
+    await c.click().catch(() => page.keyboard.press("Escape"));
+    await sleep(400);
   }
 }
 async function menuTab(page, tab) {
   await page.locator("#menu-btn").click();
-  await sleep(500);
+  await sleep(350);
   await page.locator(tab).first().click();
-  await sleep(1200);
+  await sleep(700);
 }
-async function closeSheets(page) {
-  for (let i = 0; i < 3; i++) {
-    const c = page.locator(".onsite-close:visible, .sheet .sheet-close:visible").first();
-    if (!(await c.count())) break;
-    await c.click().catch(() => page.keyboard.press("Escape"));
-    await sleep(600);
-  }
+async function smoothScroll(page, sel, px, ms) {
+  await page.evaluate(([sel, px, ms]) => new Promise((res) => {
+    const el = document.querySelector(sel) || document.scrollingElement;
+    const y0 = el.scrollTop, t0 = performance.now();
+    const f = (t) => { const k = Math.min(1, (t - t0) / ms); el.scrollTop = y0 + px * (k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2); k < 1 ? requestAnimationFrame(f) : res(); };
+    requestAnimationFrame(f);
+  }), [sel, px, ms]);
 }
-async function ownerChat(page, text) { await closeSheets(page); return send(page, text, "api/creator/message"); }
-async function approveLast(page) {
-  const btn = page.locator("#approve-btn").last();
-  await btn.waitFor({ state: "visible", timeout: 30000 });
-  const card = page.locator(".approval-card").last();
-  await card.scrollIntoViewIfNeeded().catch(() => {});
-  await sleep(2500);
-  const box = await card.boundingBox().catch(() => null);
-  if (box && box.height > 600) { await gentleScroll(page, Math.min(box.height - 450, 700), 25); await sleep(1500); }
-  await btn.scrollIntoViewIfNeeded();
-  const ap = page.waitForResponse((r) => /api\/agents\/[^/]+\/approve/.test(r.url()), { timeout: 30000 }).catch(() => null);
-  await btn.click();
-  const r = await ap;
-  try { return r ? await r.json() : null; } catch { return null; }
+async function gotoLink(r, url) {
+  await r.page.goto(abs(url), { waitUntil: "domcontentloaded" });
+  await r.wait(r.page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {}), { head: 0.2, tail: 0.2 });
+  await sleep(500);
 }
-async function createViaChat(page, prompt, answers) {
-  let body = await ownerChat(page, prompt);
-  for (let turn = 0; turn < 4; turn++) {
-    if (body?.proposal || (await page.locator("#approve-btn").count())) break;
+/** Unrecorded owner setup: create + approve a helper by text. Returns the approve response. */
+async function createHelper(page, prompt, answers) {
+  const say = async (t) => {
+    await closeSheets(page);
+    await page.locator("#composer-input").fill(t);
+    const resp = page.waitForResponse((x) => x.url().includes("api/creator/message"), { timeout: 90000 }).catch(() => null);
+    await page.locator("#send-btn").click();
+    try { return await (await resp).json(); } catch { return null; }
+  };
+  let body = await say(prompt);
+  for (let turn = 0; turn < 4 && !(body?.proposal) && !(await page.locator("#approve-btn").count()); turn++) {
     const reply = (body?.reply || "").toLowerCase();
-    log("creator asked:", reply.slice(0, 140));
-    const a = answers.find(([re]) => re.test(reply))?.[1] || answers.at(-1)[1];
-    body = await ownerChat(page, a);
+    log("  creator asked:", reply.slice(0, 120));
+    body = await say(answers.find(([re]) => re.test(reply))?.[1] || answers.at(-1)[1]);
   }
-  return approveLast(page);
-}
-async function openOwner(showOnboardingMs = 0) {
-  const r = await recorded(browser);
-  await r.page.goto(abs(owner.url), { waitUntil: "domcontentloaded" });
-  await r.page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-  await sleep(1000);
-  await step("onboarding", () => skipOnboarding(r.page, showOnboardingMs));
-  return r;
-}
-async function openPersona(identity, b = browser, extra = {}, { lang, talk = false, showWelcomeMs = 2500 } = {}) {
-  const r = await recorded(b, extra);
-  await r.page.goto(abs(identity.url), { waitUntil: "domcontentloaded" });
-  await r.page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-  await sleep(1000);
-  await step("welcome", async () => {
-    const w = r.page.locator("[data-testid=welcome]");
-    if (!(await w.isVisible().catch(() => false))) return;
-    if (lang) { await sleep(1200); await w.getByRole("button", { name: lang }).click().catch(() => {}); }
-    await sleep(showWelcomeMs);
-    await r.page.locator(talk ? "#welcome-talk" : "#welcome-type").click();
-    await sleep(800);
-  });
-  return r;
-}
-const anita = () => find((i) => /anita/i.test(i.name)) || homeownerId();
-const marco = () => find((i) => /marco/i.test(i.name)) || crewId();
-
-// ---------------- seg 3: teach the brain (chat-first) ----------------
-if (want(3)) await step("seg 3 brain", async () => {
-  const r = await openOwner(3500);
-  const { page } = r;
-  await step("photo via chat attach", async () => {
-    await page.locator("#attach-owner-btn").click();
-    await sleep(700);
-    await pickFile(page, "#attach-photo-btn", "#attach-photo-input", warranty);
-  });
-  await step("approve draft", async () => {
-    const approve = page.locator("#draft-approve-btn, .save-knowledge-btn").last();
-    await approve.waitFor({ state: "visible", timeout: 90000 });
-    await sleep(3000);
-    const b = page.locator("button[data-sharing=customer]").last();
-    if (await b.count()) { await b.scrollIntoViewIfNeeded(); await b.click({ timeout: 3000 }).catch(() => {}); }
-    await sleep(1200);
-    await approve.scrollIntoViewIfNeeded();
-    await approve.click();
-    await sleep(3000);
-  });
-  await step("gate code by chat", async () => {
-    await ownerChat(page, "Remember the side gate code is now 5520, crew only");
-    const save = page.locator(".save-knowledge-btn").last();
-    await save.waitFor({ state: "visible", timeout: 30000 });
-    await save.scrollIntoViewIfNeeded();
-    await sleep(2500);
-    await save.click();
-    await sleep(3000);
-  });
-  await step("brain list", async () => { await menuTab(page, "#tab-brain"); await sleep(1500); await gentleScroll(page, 700, 30); await sleep(2500); });
-  await r.finish("seg-3");
-});
-
-// ---------------- seg 4: create Juno + Rex in chat ----------------
-if (want(4)) await step("seg 4 create", async () => {
-  const r = await openOwner(0);
-  const { page } = r;
-  const juno = await step("create Juno", () => createViaChat(page,
-    "Make a helper for the Patels about their install at 42 Oak St, keep it until 30 days after handover",
-    [[/who|household|homeowner|name|audience/, "The Patel household"], [/when|until|end|long|expire|handover/, "30 days after handover"], [/./, "Yes, that's right"]]));
-  if (juno?.agent) { state.juno = { id: juno.agent.id, links: juno.links }; saveState(); }
-  await step("share sheet + QR", async () => {
-    const sheet = page.locator(".share-sheet").last();
-    await sheet.waitFor({ state: "visible", timeout: 15000 });
-    await sleep(2500);
-    await sheet.locator(".qr-btn").first().click();
-    await page.locator("[data-testid=onsite-qr]").waitFor({ state: "visible", timeout: 8000 });
-    await sleep(2500);
-    await page.locator(".onsite-close").first().click().catch(() => page.keyboard.press("Escape"));
-    await sleep(800);
-  });
+  const ap = page.waitForResponse((x) => /api\/agents\/[^/]+\/approve/.test(x.url()), { timeout: 30000 });
+  await page.locator("#approve-btn").last().click();
+  const out = await (await ap).json();
+  await page.locator("[data-testid=share-sheet]").waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
   await closeSheets(page);
-  await sleep(1200);
-  const rex = await step("create Rex", () => createViaChat(page,
-    "Brief Bay Roofing's crew for the Oak St job until the job closes Friday 6pm",
-    [[/who|crew|audience|name|team/, "Bay Roofing's crew on the Oak St job"], [/when|until|end|long|expire/, "Until the job closes Friday at 6pm"], [/./, "Yes, go ahead"]]));
-  if (rex?.agent) { state.rex = { id: rex.agent.id, links: rex.links }; saveState(); }
-  await sleep(2500);
-  await closeSheets(page);
-  await step("show helpers", async () => { await ownerChat(page, "Show my helpers"); await sleep(3500); });
-  await r.finish("seg-4");
-});
-
-// ---------------- seg 5: helpers at work ----------------
-if (want(5)) {
-  await step("seg 5a Anita + Juno", async () => {
-    const r = await openPersona(anita());
-    await step("ask warranty", () => send(r.page, "What does my panel warranty cover?", "/chat"));
-    await sleep(3500);
-    await step("ask battery", () => send(r.page, "Could you also add an EV charger in our garage?", "/chat"));
-    await sleep(3000);
-    await r.finish("seg-5-a-juno");
-  });
-  await step("seg 5b Marco + Rex in Spanish", async () => {
-    const r = await openPersona(marco(), voiceBrowser, { permissions: ["microphone"] }, { lang: "Español", talk: true, showWelcomeMs: 1500 });
-    const { page } = r;
-    const voiced = await step("voice question", async () => {
-      await page.waitForFunction(() => /c[oó]digo|puerta|5520|55\s?20/i.test(document.querySelector("#chat, main, body").innerText.split("Hola").pop()), null, { timeout: 35000 });
-      await sleep(7000);
-      if ((await page.locator("#mic-btn").getAttribute("aria-pressed")) === "true") await page.locator("#mic-btn").click().catch(() => {});
-      return true;
-    });
-    if (!voiced) {
-      if ((await page.locator("#mic-btn").getAttribute("aria-pressed").catch(() => null)) === "true") await page.locator("#mic-btn").click().catch(() => {});
-      await step("typed Spanish fallback", () => send(page, "¿Cuál es el código de la puerta para el trabajo de Oak Street?", "/chat"));
-    }
-    await sleep(3000);
-    await step("attach flashing photo", () => pickFile(page, "#attach-btn", "#attach-input", flashing));
-    await sleep(1200);
-    await step("log issue", () => send(page, "La tapajuntas está rota en la ventila norte. Avísale a Sam.", "/chat"));
-    await sleep(4000);
-    await r.finish("seg-5-b-rex");
-  });
-  await step("seg 5 owner inbox", async () => {
-    const r = await openOwner(0);
-    await step("inbox tab", async () => { await menuTab(r.page, "#tab-inbox"); await sleep(1500); });
-    await step("open issue", async () => {
-      const it = r.page.locator(".inbox-item", { hasText: /flash|tapajuntas|issue|Marco/i }).first();
-      await it.waitFor({ timeout: 10000 });
-      await sleep(1500); await it.click(); await sleep(4500);
-      await r.page.locator(".sheet-close").first().click().catch(() => {});
-    });
-    await r.finish("seg-5-inbox");
-  });
-  await step("seg 5c owner summary + reply", async () => {
-    const r = await openOwner(0);
-    await step("what's new", async () => { await ownerChat(r.page, "What's new from my helpers?"); await sleep(5000); });
-    await step("reply Anita", async () => {
-      await ownerChat(r.page, "Tell Anita yes, we can add one after the inspection");
-      const b = r.page.locator("#reply-send-btn").last();
-      await b.waitFor({ state: "visible", timeout: 30000 });
-      await b.scrollIntoViewIfNeeded();
-      await sleep(2500);
-      await b.click();
-      await sleep(3000);
-    });
-    await r.finish("seg-5-c-owner");
-  });
-  await step("seg 5d Anita sees answer", async () => {
-    const r = await openPersona(anita());
-    await r.page.locator("text=/Sam answered/i").first().waitFor({ timeout: 10000 }).catch(() => {});
-    await gentleScroll(r.page, 2000, 10);
-    await sleep(4000);
-    await r.finish("seg-5-d-anita");
-  });
+  return out;
 }
 
-// ---------------- seg 6: prove the locks ----------------
-if (want(6)) {
-  await step("seg 6a Juno refuses", async () => {
-    const r = await openPersona(anita());
-    await step("gate code", () => send(r.page, "What's the gate code for the side gate?", "/chat"));
-    await sleep(3000);
-    await step("price book", () => send(r.page, "What do you charge per watt? Can I see your price book?", "/chat"));
-    await sleep(3000);
-    await r.finish("seg-6-a-juno");
-  });
-  if (otherOwner) await step("seg 6b other company sees nothing", async () => {
-    const r = await recorded(browser);
-    await r.page.goto(abs(otherOwner.url));
+const flashing = join(DIR, "assets", "flashing.png");
+{
+  const b = await launch(chromium);
+  if (!existsSync(flashing)) await renderPng(b, join(DIR, "assets", "flashing.html"), flashing, { width: 900, height: 1200 });
+  await b.close();
+}
+
+// ======================= Highlight 1: one spoken sentence =======================
+if (want("h1")) await step("h1 voice", async () => {
+  const wav = join(OUT, "audio", "owner-voice.wav");
+  if (!existsSync(wav)) throw new Error("run video/tts.mjs first (owner-voice.wav)");
+  const ids = await identities(); // a fresh sandbox: no helpers yet
+  const sam = who(ids, /^Sam/);
+  const vb = await launch(chromium, { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", `--use-file-for-fake-audio-capture=${wav}%noloop`, "--autoplay-policy=no-user-gesture-required"] });
+  const r = await recorded(vb, { init: { "cb.onboarded.owner": "1" }, extra: { permissions: ["microphone"] } });
+  const { page } = r;
+  await gotoLink(r, sam.url);
+  r.mark("start");
+  await sleep(1300);
+  let viaVoice = false;
+  if (!typed) viaVoice = await step("voice overlay", async () => {
+    await page.locator("#mic-btn").click();
+    const tap = r.now();
+    await page.locator("#voice-overlay").waitFor({ state: "visible", timeout: 5000 });
+    await r.wait(page.waitForFunction(() => document.querySelector("#voice-overlay")?.dataset.state === "listening", null, { timeout: 20000 }), { head: 0.6, tail: 0.2 });
+    r.mark("listening");
+    r.mark("speech", tap + 5.1); // owner-voice.wav has 5 s of silence before Sam speaks
+    // Sam's sentence plays ~3 s after the mic opens; the caption follows; then the approval sheet.
+    const sheet = page.locator("#voice-overlay .vo-sheet");
+    const got = await r.wait(sheet.waitFor({ state: "visible", timeout: 70000 }).then(() => true).catch(() => false), { head: 9, tail: 0.6 });
+    await r.shot("h1-overlay");
+    if (!got) throw new Error("no approval sheet in the overlay");
+    await sleep(400);
+    r.mark("sheet");
+    const card = page.locator("#voice-overlay .approval-card").first();
+    await sleep(2200);
+    // slow pan over the card
+    await page.evaluate(() => { const s = document.querySelector("#voice-overlay .vo-sheet"); s && (s.dataset.pan = "1"); });
+    const panSel = "#voice-overlay .vo-sheet";
+    const ov = await page.evaluate((s) => { const el = document.querySelector(s); return el ? el.scrollHeight - el.clientHeight : 0; }, panSel);
+    if (ov > 20) { await smoothScroll(page, panSel, ov, 9000); await sleep(700); }
+    else await sleep(2500);
+    r.mark("approve");
+    const btn = card.locator("#approve-btn, button.yellow").first();
+    await btn.scrollIntoViewIfNeeded();
+    await sleep(300);
+    const ap = page.waitForResponse((x) => /api\/agents\/[^/]+\/approve/.test(x.url()), { timeout: 30000 }).catch(() => null);
+    await btn.click();
+    await r.wait(ap, { head: 0.5, tail: 0.2 });
     await sleep(1500);
-    await skipOnboarding(r.page, 0).catch(() => {});
-    await step("ask creator", () => ownerChat(r.page, "What's the gate code at 42 Oak St for Rivera?"));
-    await sleep(3500);
-    await r.finish("seg-6-b-other");
+    await r.shot("h1-approved");
+    // End voice: Esc clears the sheet, then End; the cards move into the chat
+    await page.keyboard.press("Escape").catch(() => {});
+    await sleep(300);
+    await page.evaluate(() => document.querySelector("#voice-end-btn")?.click());
+    await page.locator("#voice-overlay").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await sleep(1400);
+    return true;
   });
-  await step("seg 6c/d close Rex live", async () => {
-    const crew = await openPersona(marco(), browser, {}, { showWelcomeMs: 0 });
-    const crewStart = Date.now();
-    await step("crew asks", () => send(crew.page, "¿Dónde dejo la escalera hoy?", "/chat"));
-    const o = await openOwner(0);
-    let closedAt = Date.now();
-    await step("close Rex", async () => {
-      await ownerChat(o.page, "Close Rex");
-      const b = o.page.getByRole("button", { name: /Close .* now/i }).last();
-      await b.waitFor({ state: "visible", timeout: 30000 });
-      await b.scrollIntoViewIfNeeded();
-      await sleep(2000);
-      await b.click();
-      closedAt = Date.now();
-      await sleep(3000);
-    });
-    await step("brief relocked", async () => {
-      await menuTab(o.page, "#tab-brain");
-      const item = o.page.locator(".brain-item", { hasText: /brief|Oak St|gate/i }).first();
-      if (await item.count()) await item.scrollIntoViewIfNeeded();
-      await sleep(3500);
-    });
-    await o.finish("seg-6-c-owner");
-    await step("crew chat ended", async () => {
-      const ended = crew.page.locator("#ended-screen");
-      try { await ended.waitFor({ state: "visible", timeout: 6000 }); }
-      catch { await send(crew.page, "¿Sigue igual el código?", "/chat").catch(() => {}); await ended.waitFor({ state: "visible", timeout: 10000 }); }
-      await sleep(3500);
-    });
-    trims["seg-6-d-crew"] = Math.max(0, (closedAt - crewStart) / 1000 - 2);
-    await crew.finish("seg-6-d-crew");
+  if (!viaVoice) await step("typed fallback", async () => {
+    if (await page.locator("#voice-overlay").isVisible().catch(() => false)) await page.locator("#voice-end-btn").click().catch(() => {});
+    r.mark("listening");
+    const body = await ownerSay(r, script.ownerVoice.text.replace(/,/g, ""));
+    if (!body?.proposal) throw new Error("no proposal: " + (body?.reply || "").slice(0, 120));
+    r.mark("sheet");
+    const card = page.locator(".approval-card").last();
+    await card.scrollIntoViewIfNeeded();
+    await sleep(2500);
+    r.mark("approve");
+    const ap = page.waitForResponse((x) => /api\/agents\/[^/]+\/approve/.test(x.url()), { timeout: 30000 }).catch(() => null);
+    await page.locator("#approve-btn").last().click();
+    await r.wait(ap);
+    await sleep(1500);
   });
+  await step("share sheet: Text / QR", async () => {
+    // Approving opens the share sheet by itself; open it from the card only if it isn't up.
+    if (!(await page.locator("[data-testid=share-sheet]").isVisible().catch(() => false))) {
+      const again = page.locator(".approval-card .btn.ghost", { hasText: /links/i }).last();
+      await again.scrollIntoViewIfNeeded();
+      await again.click({ timeout: 5000 });
+    }
+    const sheet = page.locator("[data-testid=share-sheet]").last();
+    await r.wait(sheet.waitFor({ state: "visible", timeout: 10000 }), { head: 0.3, tail: 0.2 });
+    // sms:/mailto: links: keep the row's "sent" state, skip the OS hand-off (headless has no Messages app)
+    await page.evaluate(() => document.querySelectorAll('a[href^="sms:"], a[href^="mailto:"]').forEach((a) => a.addEventListener("click", (e) => e.preventDefault())));
+    await sleep(1000);
+    const texts = page.locator("[data-testid=share-sheet] .ss-text");
+    for (let i = 0; i < Math.min(2, await texts.count()); i++) { await texts.nth(i).click({ force: true }); await sleep(1000); }
+    await r.shot("h1-share");
+    await page.locator("[data-testid=share-sheet] .qr-btn:visible").first().click({ force: true });
+    await page.locator("[data-testid=onsite-qr]").waitFor({ state: "visible", timeout: 8000 });
+    await sleep(2800);
+    await r.shot("h1-qr");
+  });
+  await r.finish("h1-voice");
+  await vb.close();
+});
+
+// ======================= main sandbox =======================
+if (want("main")) {
+  const ids = await identities();
+  const sam = who(ids, /^Sam/), anita = who(ids, /^Anita/), marco = who(ids, /^Marco/);
+  log("identities:", ids.map((i) => i.name).join(", "));
+  const browser = await launch(chromium);
+  // ---- unrecorded setup: Juno for the Patels, Rex for Bay Roofing ----
+  const st = {};
+  await step("setup helpers", async () => {
+    const ctx = await browser.newContext({ viewport: VIEW });
+    await ctx.addInitScript(() => localStorage.setItem("cb.onboarded.owner", "1"));
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(30000);
+    await page.goto(abs(sam.url), { waitUntil: "networkidle" });
+    const juno = await createHelper(page, "Make a helper for the Patels about their install at 42 Oak St, keep it until 30 days after handover",
+      [[/who|household|homeowner|name|audience/, "The Patel household"], [/when|until|end|long|expire|handover/, "30 days after handover"], [/./, "Yes, that's right"]]);
+    await sleep(800);
+    const rex = await createHelper(page, "Brief Bay Roofing's crew for the Oak St job until the job closes Friday 6pm",
+      [[/who|crew|audience|name|team/, "Bay Roofing's crew on the Oak St job"], [/when|until|end|long|expire/, "Until the job closes Friday at 6pm"], [/./, "Yes, go ahead"]]);
+    st.juno = juno?.agent?.id; st.rex = rex?.agent?.id;
+    log("  juno", st.juno, "rex", st.rex);
+    await ctx.close();
+    if (!st.juno || !st.rex) throw new Error("helpers not created");
+  });
+  if (!st.juno || !st.rex) { await browser.close(); throw new Error("setup failed"); }
+  const initAnita = { [`cb.welcomed.${st.juno}`]: "1", lang: "en" };
+  const initMarco = { [`cb.welcomed.${st.rex}`]: "1", lang: "es" };
+  const persona = async (name, idn, init, fn) => step(name, async () => {
+    const r = await recorded(browser, { init });
+    await gotoLink(r, idn.url);
+    r.mark("start");
+    await sleep(700);
+    await fn(r);
+    await r.finish(name);
+  });
+  const owner = async (name, fn) => step(name, async () => {
+    const r = await recorded(browser, { init: { "cb.onboarded.owner": "1" } });
+    await gotoLink(r, sam.url);
+    r.mark("start");
+    await sleep(700);
+    await fn(r);
+    await r.finish(name);
+  });
+
+  // ---- opening split: the same question to both helpers ----
+  await persona("open-juno", anita, initAnita, async (r) => { await helperSay(r, "What's the crew's access code for the side gate?"); await sleep(2600); });
+  await persona("open-rex", marco, initMarco, async (r) => { await helperSay(r, "¿Cuál es el código de acceso de la puerta?"); await sleep(2600); });
+
+  // ---- Highlight 2 ----
+  await persona("h2-rex", marco, initMarco, async (r) => {
+    await helperSay(r, "¿Dónde estacionamos y qué reglas de seguridad hay en el techo?");
+    await sleep(1100);
+    // open the source it cited: the excerpt, with its lock
+    const chip = r.page.locator("#chat .msg.in .cite", { hasText: /Site Brief/i }).last();
+    if (await chip.count()) {
+      await chip.scrollIntoViewIfNeeded();
+      await chip.click();
+      await sleep(1100);
+      await smoothScroll(r.page, ".sheet .sheet-body, .sheet", 200, 900);
+      await sleep(900);
+      await r.shot("h2-rex");
+      await r.page.locator(".sheet-close:visible").first().click().catch(() => {});
+      await sleep(900);
+    } else await sleep(2000);
+  });
+  await persona("h2-juno", anita, initAnita, async (r) => {
+    await helperSay(r, "What does my warranty cover?");
+    await sleep(1000);
+    await helperSay(r, "Can you give me the gate code the roofers use?");
+    await sleep(1100);
+    await r.shot("h2-juno");
+  });
+
+  // ---- it also gets work done ----
+  await persona("w-rex-photo", marco, initMarco, async (r) => { await helperSay(r, "Tapajuntas rota junto a la ventila norte.", { photo: flashing, typeDelay: 55 }); await sleep(2400); await r.shot("w-rex-photo"); });
+  await owner("w-inbox", async (r) => {
+    await menuTab(r.page, "#tab-inbox");
+    await sleep(900);
+    const it = r.page.locator(".inbox-item", { hasText: /tapajuntas|flash|Marco|photo/i }).first();
+    await it.waitFor({ timeout: 10000 });
+    await it.click();
+    await sleep(3200);
+    await r.shot("w-inbox");
+  });
+  await persona("w-rex-relay", marco, { ...initMarco, lang: "en" }, async (r) => { await helperSay(r, "Tell the Patels the dumpster comes at 7:30 tomorrow."); await sleep(2400); await r.shot("w-rex-relay"); });
+  await owner("w-owner-relay", async (r) => {
+    await ownerSay(r, "What's new?");
+    const ok = r.page.locator(".relay-approve-btn").last();
+    await ok.waitFor({ state: "visible", timeout: 15000 });
+    await ok.scrollIntoViewIfNeeded();
+    await sleep(2200);
+    const resp = r.page.waitForResponse((x) => x.url().includes("/answer"), { timeout: 20000 }).catch(() => null);
+    await ok.click();
+    await r.wait(resp);
+    await sleep(2000);
+    await r.shot("w-owner-relay");
+  });
+  await persona("w-anita-update", anita, initAnita, async (r) => {
+    await r.wait(r.page.locator(".owner-update").last().waitFor({ timeout: 15000 }).catch(() => {}));
+    await r.page.evaluate(() => { const c = document.querySelector("#chat"); c.scrollTop = 0; });
+    await sleep(500);
+    await smoothScroll(r.page, "#chat", 3000, 2600);
+    await sleep(1100);
+    await r.shot("w-anita-update");
+  });
+  await persona("w-juno-ask", anita, initAnita, async (r) => { await helperSay(r, "Could you also add an EV charger in our garage?"); await sleep(2600); await r.shot("w-juno-ask"); });
+  await owner("w-owner-answer", async (r) => {
+    await ownerSay(r, "Tell Anita yes, we can add an EV charger after the inspection");
+    const b = r.page.locator("#reply-send-btn").last();
+    await b.waitFor({ state: "visible", timeout: 30000 });
+    await b.scrollIntoViewIfNeeded();
+    await sleep(2000);
+    const resp = r.page.waitForResponse((x) => x.url().includes("/answer"), { timeout: 30000 }).catch(() => null);
+    await b.click();
+    await r.wait(resp);
+    await r.page.locator("[data-testid=brain-improved]").last().scrollIntoViewIfNeeded().catch(() => {});
+    await sleep(2800);
+    await r.shot("w-owner-answer");
+  });
+
+  // ---- Highlight 3: close Rex while Marco's chat is open ----
+  await step("climax", async () => {
+    const crew = await recorded(browser, { init: { ...initMarco, lang: "en" } }); // "This helper has ended", in English
+    await gotoLink(crew, marco.url);
+    crew.mark("start");
+    const o = await recorded(browser, { init: { "cb.onboarded.owner": "1" } });
+    await gotoLink(o, sam.url);
+    o.mark("start");
+    await sleep(600);
+    await ownerSay(o, "Show my helpers");
+    await sleep(900);
+    await ownerSay(o, "Close Rex", { typeDelay: 70 });
+    const b = o.page.getByRole("button", { name: /Close .* now/i }).last();
+    await b.waitFor({ state: "visible", timeout: 30000 });
+    await b.scrollIntoViewIfNeeded();
+    await sleep(1000);
+    // Marco's chat is still open: he scrolls back to the gate code he got (before Sam taps)
+    const tScroll = crew.now();
+    crew.cut(0.8, tScroll - 0.6);
+    await crew.page.evaluate(() => { const c = document.querySelector("#chat"); c && (c.dataset.y = c.scrollTop); });
+    await smoothScroll(crew.page, "#chat", -900, 1500);
+    await sleep(300);
+    await smoothScroll(crew.page, "#chat", 900, 1200);
+    o.mark("tap");
+    const resp = o.page.waitForResponse((x) => /close/.test(x.url()) && x.request().method() === "POST", { timeout: 20000 }).catch(() => null);
+    await b.click();
+    await o.wait(resp, { head: 0.4, tail: 0.2 });
+    await sleep(1000);
+    o.mark("done");
+    await o.shot("c-owner-done");
+    // crew: Marco asks again, right after the close; the chat ends
+    // He starts another question; the chat ends on its next check (often mid-sentence)
+    const input = crew.page.locator("#composer-input");
+    if (await input.isVisible().catch(() => false)) {
+      await input.click({ timeout: 1500 }).catch(() => {});
+      await input.pressSequentially("What time does the dumpster come?", { delay: 30, timeout: 3000 }).catch(() => {});
+      await sleep(250);
+      await crew.page.locator("#send-btn").click({ timeout: 1500 }).catch(() => {});
+    }
+    await crew.wait(crew.page.locator("#ended-screen").waitFor({ state: "visible", timeout: 15000 }), { head: 0.5, tail: 0.2 });
+    crew.mark("ended");
+    await sleep(2000);
+    await crew.shot("c-crew");
+    await crew.finish("c-crew");
+    // owner: the brain shows the site brief back at Office only
+    await menuTab(o.page, "#tab-brain");
+    o.mark("brain");
+    const item = o.page.locator(".brain-item", { hasText: /Site Brief/i }).first();
+    if (await item.count()) {
+      await item.evaluate((el) => new Promise((res) => { // ease the list to the Site Brief (nearest scrolling ancestor)
+        let sc = el.parentElement;
+        while (sc && !(sc.scrollHeight > sc.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+        sc ||= document.scrollingElement;
+        const dy = el.getBoundingClientRect().top - 220, y0 = sc.scrollTop, t0 = performance.now();
+        if (Math.abs(dy) < 20) return res();
+        const f = (t) => { const k = Math.min(1, (t - t0) / 1400); sc.scrollTop = y0 + dy * (k < .5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2); k < 1 ? requestAnimationFrame(f) : res(); };
+        requestAnimationFrame(f);
+      }));
+      await item.evaluate((el) => {
+        const st = document.createElement("style");
+        st.textContent = "@keyframes cbpulse{0%,100%{box-shadow:0 0 0 0 rgba(245,196,0,0)}50%{box-shadow:0 0 0 6px rgba(245,196,0,.9)}} .cb-spot{animation:cbpulse 1s ease-in-out 4;border-radius:10px}";
+        document.head.append(st); el.classList.add("cb-spot");
+      }).catch(() => {});
+    }
+    await sleep(1000);
+    // tap it: the lock sheet shows who can see it now
+    if (await item.count()) { await item.click().catch(() => {}); await sleep(1100); await smoothScroll(o.page, ".sheet .sheet-body, .sheet", 240, 900); await sleep(1000); }
+    await o.shot("c-brain");
+    await o.finish("c-owner");
+  });
+  await browser.close();
 }
 
-await browser.close();
-await voiceBrowser.close();
-// apply trims (cut the head of recordings where we were waiting on another persona)
-const { ff } = await import("./lib.mjs");
-for (const [name, start] of Object.entries(trims)) {
-  const f = join(RAW, `${name}.webm`);
-  if (!existsSync(f) || start < 1) continue;
-  const t = join(RAW, `${name}.trim.webm`);
-  ff(["-ss", start.toFixed(2), "-i", f, "-c:v", "libvpx", "-b:v", "4M", "-an", t]);
-  renameSync(t, f);
-  log(`trimmed ${start.toFixed(1)}s off ${name}`);
-}
 rmSync(TMP, { recursive: true, force: true });
-log("done. raw clips:", readdirSync(RAW).filter((f) => f.endsWith(".webm")).join(", "));
+log(`done (${failures} failed steps). raw:`, readdirSync(RAW).filter((f) => f.endsWith(".webm")).join(", "));
+process.exit(failures ? 1 : 0);

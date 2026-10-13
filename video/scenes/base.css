@@ -48,3 +48,10 @@ h2 { font-weight: 800; font-size: 96px; }
 .up { opacity: 0; animation: up .7s cubic-bezier(.2,.7,.2,1) forwards; }
 .in { opacity: 0; animation: in .8s ease forwards; }
 .pop { opacity: 0; animation: pop .6s cubic-bezier(.2,.7,.2,1) forwards; }
+
+/* Line icons from public/icons.js (compose writes ../out/scene-icons.js; <i data-i="house"></i> becomes an inline SVG). */
+i[data-i] { display: inline-flex; vertical-align: -0.12em; }
+i[data-i] svg { width: 1em; height: 1em; }
+/* Slow drift of the site-plan grid for the whole scene: scenes never sit on a frozen frame. */
+@keyframes drift { from { background-position: 0 0, 0 0; } to { background-position: 60px 36px, 60px 36px; } }
+body.drift { animation: drift 40s linear 1 forwards; }
