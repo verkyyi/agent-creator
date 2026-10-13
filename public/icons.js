@@ -21,6 +21,7 @@ const P = {
   attach: '<path d="M20.5 11.5l-8.2 8.2a5.2 5.2 0 0 1-7.4-7.4l8.6-8.6a3.5 3.5 0 0 1 5 5l-8.6 8.6a1.8 1.8 0 0 1-2.5-2.5l7.9-7.9"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  checkCircle: '<circle cx="12" cy="12" r="9"/><path d="M8 12.3l2.8 2.8L16.2 9.5"/>',
   chevron: '<path d="M9 5l7 7-7 7"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',

@@ -12,6 +12,7 @@ export const EN = {
   hi: "Hi {n}, I'm {h} from {c}.", hiAnon: "Hi, I'm {h} from {c}.",
   helpsWith: "I can help with {j}.", worksUntil: "I work until {e}.",
   typeInstead: "Type instead", notShare: "Not something I can share",
+  onIt: "On it.", seen: "Seen", reactDone: "Done",
   source: "Source", foundIn: "Found in", checking: "Checking your notes…", source1: "1 source", sourcesN: "{n} sources",
   loading: "Loading…", sendFail: "That didn't go through. Check your signal and send it again.",
   aiDown: "The AI assistant is unavailable right now, so this answer is quoted straight from the company's notes.",
@@ -153,7 +154,7 @@ cards: {
       approveInto: "Approve into Brain", checkRead: "Check what I read", notUsable: "Nothing is usable until you approve it.", tooBig: "That file is over 10 MB.",
     },
     common: {
-      netErr: "Can't reach CrewBrain. Check your signal and try again.", close: "Close", thinking: "Thinking", section: "Section",
+      netErr: "Can't reach CrewBrain. Check your signal and try again.", close: "Close", thinking: "Thinking", section: "Section", onIt: "On it.", seen: "Seen", reactDone: "Done",
       origin: { drive: "From Google Drive", gmail: "From Gmail", photo: "Photo", answer: "Your answer", doc: "Document" },
       lock: {
         internal: "Office only", crew: "Crew", customer: "Homeowners",
@@ -194,6 +195,7 @@ export const ES = {
   hi: "Hola {n}, soy {h} de {c}.", hiAnon: "Hola, soy {h} de {c}.",
   helpsWith: "Te ayudo con {j}.", worksUntil: "Funciono hasta {e}.",
   typeInstead: "Prefiero escribir", notShare: "No puedo compartir eso",
+  onIt: "Ya voy.", seen: "Visto", reactDone: "Hecho",
   source: "Fuente", foundIn: "Encontrado en", checking: "Revisando las notas…", source1: "1 fuente", sourcesN: "{n} fuentes",
   loading: "Cargando…", sendFail: "No se pudo enviar. Revisa tu señal e inténtalo otra vez.",
   aiDown: "El asistente de IA no está disponible ahora; esta respuesta viene tal cual de las notas de la empresa.",
@@ -335,7 +337,7 @@ cards: {
       approveInto: "Aprobar en el cerebro", checkRead: "Revisa lo que leí", notUsable: "Nada se puede usar hasta que lo apruebes.", tooBig: "Ese archivo pesa más de 10 MB.",
     },
     common: {
-      netErr: "No se puede conectar con CrewBrain. Revisa tu señal e inténtalo otra vez.", close: "Cerrar", thinking: "Pensando", section: "Sección",
+      netErr: "No se puede conectar con CrewBrain. Revisa tu señal e inténtalo otra vez.", close: "Cerrar", thinking: "Pensando", section: "Sección", onIt: "Ya voy.", seen: "Visto", reactDone: "Hecho",
       origin: { drive: "De Google Drive", gmail: "De Gmail", photo: "Foto", answer: "Tu respuesta", doc: "Documento" },
       lock: {
         internal: "Solo oficina", crew: "Cuadrilla", customer: "Propietarios",

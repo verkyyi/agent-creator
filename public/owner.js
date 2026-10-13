@@ -1,4 +1,4 @@
-import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, openSheet, closeSheet, shareSheet, wireVoice, scrollToEnd, typingBubble, originBadge, fmtDate, store } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, openSheet, closeSheet, shareSheet, wireVoice, scrollToEnd, typingBubble, originBadge, fmtDate, store, splitReply, textInSequence, addReaction, markSeen } from "./common.js";
 import { install as installCards, renderCard, renderCardInto, relayCard } from "./owner-cards.js";
 import { pickedLang, applyDocLang, langPicker, loadTable, setOwnerStrings, ot, fmtWhen, baseLang } from "./strings.js";
 
@@ -106,11 +106,27 @@ const setChatH = () => { if (log.clientHeight) document.documentElement.style.se
 if (window.ResizeObserver) new ResizeObserver(setChatH).observe(log);
 setChatH();
 
-function bubble(role, text) {
+function bubble(role, text, reaction) {
   const out = role === "owner" || role === "user";
   const el = h("div", { class: "msg " + (out ? "out" : "in") }, text);
+  if (out && reaction === "check") addReaction(el, ot("common.reactDone"));
   log.append(el); scrollToEnd(log); return el;
 }
+/** CrewBrain's reply as 2-3 short consecutive bubbles, like a text thread; typing pauses between when animated. */
+async function creatorBubbles(text, animate = false) {
+  const parts = splitReply(text);
+  const make = (part, i) => { const el = bubble("creator", part); if (i > 0) el.classList.add("cont"); return el; };
+  // No await on the history path keeps message and card order intact.
+  if (animate && parts.length > 1) await textInSequence(log, parts, make);
+  else parts.forEach(make);
+}
+/** The owner's latest bubble before `node` (or the latest overall): it gets the check when an action completes. */
+function ownerBubbleBefore(node) {
+  const outs = [...log.querySelectorAll(":scope > .msg.out")];
+  const prior = node?.isConnected ? outs.filter((el) => el.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) : outs;
+  return prior[prior.length - 1];
+}
+const reactOwner = (node) => addReaction(ownerBubbleBefore(node), ot("common.reactDone"));
 
 const SUGGESTIONS = () => ot("create.suggestions");
 function suggestionChips() {
@@ -131,15 +147,15 @@ async function loadCreator() {
     suggestionChips()));
   if (!r.ok) return;
   for (const m of r.data.messages || []) {
-    if (m.text) bubble(m.role, m.text);
+    if (m.text) { if (m.role === "owner") bubble(m.role, m.text, m.reaction); else creatorBubbles(m.text); }
     if (m.proposal) renderProposal(m.proposal);
     if (m.card) { try { renderCard(m.card); } catch {} }
   }
   scrollToEnd(log);
 }
 
-function handleCreatorReply(data) {
-  if (data.reply) bubble("creator", data.reply);
+async function handleCreatorReply(data, { animate = false } = {}) {
+  if (data.reply) { if (animate) await creatorBubbles(data.reply, true); else creatorBubbles(data.reply); }
   if (data.replyDraft) renderReplyDraft(data.replyDraft);
   if (data.proposal) renderProposal(data.proposal);
   if (data.card) { try { renderCard(data.card); } catch (e) { console.warn("card failed", e); } }
@@ -147,13 +163,22 @@ function handleCreatorReply(data) {
   scrollToEnd(log);
 }
 
+const ACK_AFTER_MS = 800;
 async function sendCreator(text) {
-  bubble("owner", text);
+  const mine = bubble("owner", text);
   const typing = typingBubble(); log.append(typing); scrollToEnd(log);
+  // Slow work gets a quick "On it." first; answers under ~800 ms never show it.
+  let ack = null;
+  const ackTimer = setTimeout(() => {
+    ack = h("div", { class: "msg in ack", "data-testid": "ack" }, ot("common.onIt"));
+    typing.before(ack); scrollToEnd(log);
+  }, ACK_AFTER_MS);
   const r = await api("api/creator/message", creatorLang() ? { text, lang: creatorLang() } : { text });
+  clearTimeout(ackTimer); ack?.remove();
   typing.remove();
   if (!r.ok) { bubble("creator", r.data.reply || r.data.error || ot("toast.sendFail")); return; }
-  handleCreatorReply(r.data);
+  markSeen(mine, ot("common.seen"));
+  await handleCreatorReply(r.data, { animate: true });
 }
 
 $("#composer").addEventListener("submit", (e) => {
@@ -231,6 +256,7 @@ function renderReplyDraft(d, target = log) {
     toast(ot("reply.sentTo", { to: d.to }));
     ta.readOnly = true; ta.removeAttribute("id"); sendB.removeAttribute("id");
     card.classList.add("sent");
+    reactOwner(card);
     foot.replaceChildren(h("div", { class: "published" }, icon("check"), ot("reply.sentTo", { to: d.to })),
       ...(r.data.brainImproved ? [h("div", { class: "muted brain-improved", "data-testid": "brain-improved" }, ot("reply.brainImproved"))] : []));
     refreshInbox();
@@ -323,6 +349,7 @@ function renderProposal(p, target = log) {
       if (r.data.agent) upsertHelper({ ...r.data.agent, job: jobHint(p) });
       btn.removeAttribute("id");
       showPublished();
+      reactOwner(card);
       log.append(h("div", { class: "sys-note" }, ot("ac.liveUntil", { n: p.name, e: fmtWhen(r.data.agent?.expiresAt || p.endsAt, r.data.agent?.timeZone || p.timeZone || state.tz, r.data.agent?.endsLabel || p.endsLabel) })));
       scrollToEnd(log);
       if (r.data.links?.length) renderCard({ type: "share", agent: { ...(r.data.agent || {}), name: r.data.agent?.name || p.name, job: jobHint(p) }, links: r.data.links });

@@ -1,4 +1,4 @@
-import { api, h, toast, ICON, icon, avatar, avatarKey, svgIcon, downscale, wireVoice, voiceCard, scrollToEnd, typingBubble, citeChip, sourcesToggle, store } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, avatarKey, svgIcon, downscale, wireVoice, voiceCard, scrollToEnd, typingBubble, citeChip, sourcesToggle, store, splitReply, textInSequence, addReaction, markSeen } from "./common.js";
 import { EN, fmt, pickedLang, baseLang, loadTable, applyDocLang, langPicker } from "./strings.js";
 
 const $ = (s) => document.querySelector(s);
@@ -120,11 +120,16 @@ function renderHeader() {
   $("#expiry-bar").hidden = false;
 }
 
-function userBubble(text, img) {
+/** User bubbles by their index in the server's history, so a reaction that lands later can find its bubble. */
+const userEls = new Map();
+function userBubble(text, img, reaction) {
   const el = h("div", { class: "msg out" }, img ? h("img", { class: "photo", src: img, alt: "" }) : null, text || "");
+  if (reaction === "check") addReaction(el, t().reactDone);
   chat.append(el); scrollToEnd(chat); hideStarters(); return el;
 }
-function helperMessage(m) {
+/** Write actions that put a check reaction on the user's message (mirrors WRITE_ACTIONS in src/core.ts). */
+const WRITE_ACTIONS = ["issue_logged", "walkthrough_requested", "relay_requested", "relay_sent", "owner_answer"];
+async function helperMessage(m, { animate = false } = {}) {
   if (m.action?.kind === "owner_update") {
     // An owner-approved update from the company: a blue card instead of a plain bubble.
     chat.append(h("div", { class: "owner-update", "data-kind": "owner_update" },
@@ -134,13 +139,19 @@ function helperMessage(m) {
     return;
   }
   const refused = !!m.refused;
-  const el = h("div", { class: "msg in" + (refused ? " denied" : "") },
-    refused ? h("div", { class: "who-line" }, icon("lock"), t().notShare) : null,
-    m.reply ?? m.text ?? "");
-  // References fold into one quiet line; refused answers carry none.
+  // Like texting a person: a reply with several sentences arrives as 2-3 short bubbles.
+  const parts = refused ? [m.reply ?? m.text ?? ""] : splitReply(m.reply ?? m.text ?? "");
+  const make = (part, i) => {
+    const b = h("div", { class: "msg in" + (refused ? " denied" : "") + (i > 0 ? " cont" : "") },
+      refused && i === 0 ? h("div", { class: "who-line" }, icon("lock"), t().notShare) : null, part);
+    chat.append(b); return b;
+  };
+  // History renders synchronously (no await on this path keeps message order intact).
+  const els = animate && parts.length > 1 ? await textInSequence(chat, parts, make) : parts.map(make);
+  const el = els[els.length - 1];
+  // References fold into one quiet line under the LAST bubble; refused answers carry none.
   if (m.citations?.length && !refused) el.append(sourcesToggle(m.citations.map((c) => citeChip(c, id, { prefix: t().source, loading: t().loading })), t().sources(m.citations.length)));
   if (m.notice) el.append(h("div", { class: "notice" }, isEn() ? m.notice : t().aiDown));
-  chat.append(el);
   if (m.action?.kind === "owner_answer") {
     const owner = firstName(info?.ownerName) || t().theOwner;
     chat.append(h("div", { class: "owner-answer", "data-kind": "owner_answer" },
@@ -164,10 +175,14 @@ function actionText(a) {
 const voiceTexts = () => ({ ...t().vs, ...t().vo, helper: firstName(info?.name) || t().vo.title, source: t().source, loading: t().loading });
 const cardOpts = () => ({ texts: voiceTexts, agentId: id, actionLabel: actionText });
 /** Render chat messages, collapsing each run of via:"voice" turns (same session) into one voice card. */
-function renderMessages(msgs) {
+function renderMessages(msgs, offset = 0) {
   for (let i = 0; i < msgs.length; i++) {
     const m = msgs[i];
-    if (m.via !== "voice") { if (m.role === "user") userBubble(m.text, m.imageDataUrl); else helperMessage(m); continue; }
+    if (m.via !== "voice") {
+      if (m.role === "user") userEls.set(offset + i, userBubble(m.text, m.imageDataUrl, m.reaction));
+      else helperMessage(m);
+      continue;
+    }
     const group = [m];
     while (i + 1 < msgs.length && msgs[i + 1].via === "voice" && (msgs[i + 1].sessionId || "") === (m.sessionId || "")) group.push(msgs[++i]);
     chat.append(voiceCard(voiceSummary(group), cardOpts()));
@@ -244,9 +259,9 @@ async function loadHistory() {
   scrollToEnd(chat);
 }
 
-function handleReply(data) {
+async function handleReply(data, opts) {
   if (data && data.error === "ended") { endHelper(data.state, data.reply); return; }
-  helperMessage(data || {});
+  await helperMessage(data || {}, opts);
 }
 
 async function pollHistory() {
@@ -255,9 +270,16 @@ async function pollHistory() {
   if (r.status === 410) { endHelper(r.data.state, r.data.reply); return; }
   if (!r.ok || sending) return;
   const msgs = r.data.messages || [];
+  // A reaction can land later (the owner answered the question): put it on the bubble already shown.
+  for (const [i, el] of userEls) if (msgs[i]?.reaction === "check") addReaction(el, t().reactDone);
   if (msgs.length <= rendered) { rendered = Math.min(rendered, msgs.length); return; }
   // Voice turns from this device are summed up by the live voice card when the session ends.
-  renderMessages(msgs.slice(rendered).filter((m) => m.via !== "voice"));
+  for (let i = rendered; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m.via === "voice") continue;
+    if (m.role === "user") userEls.set(i, userBubble(m.text, m.imageDataUrl, m.reaction));
+    else helperMessage(m);
+  }
   rendered = msgs.length;
 }
 
@@ -265,15 +287,22 @@ async function send(text, img) {
   sending++;
   try { await sendInner(text, img); } finally { sending--; }
 }
-/* Pending bubble: typing dots + the server's status line, then "Found in" chips once retrieval is done. */
+/* Pending bubble: typing dots, then (only if the answer takes over ~800 ms) a quick acknowledgement
+   ("On it." or the server's status line), then "Found in" chips once retrieval is done. */
+const ACK_AFTER_MS = 800;
 function pendingBubble() {
-  const status = h("span", { class: "pending-status" });
+  const status = h("span", { class: "pending-status", "data-testid": "ack" });
   const found = h("div", { class: "cites found", hidden: true });
   const el = h("div", { class: "msg in pending", "aria-live": "polite", "data-testid": "pending" },
     h("div", { class: "typing", "aria-label": "Thinking" }, h("i"), h("i"), h("i")), status, found);
+  let last = "", acked = false;
+  const show = () => { status.textContent = last || t().onIt; scrollToEnd(chat); };
+  const timer = setTimeout(() => { acked = true; show(); }, ACK_AFTER_MS);
   return {
     el,
-    status(s) { status.textContent = isEn() ? s || "" : t().checking; scrollToEnd(chat); },
+    status(s) { last = s ? (isEn() ? s : t().checking) : ""; if (acked) show(); },
+    action() { last = t().onIt; if (acked) show(); },
+    done() { clearTimeout(timer); },
     sources(cites) {
       if (!cites?.length) return;
       found.innerHTML = "";
@@ -286,7 +315,7 @@ function pendingBubble() {
 /* POST …/chat?stream=1 and read the SSE stream. Resolves to the same { ok, status, data } shape as api().
    A JSON response (pwa.js offline outbox 202, 401 from the auth middleware) is passed through as-is.
    Returns null when nothing came back at all, so the caller can use the plain route. */
-async function streamChat(body, pending) {
+async function streamChat(body, pending, onFirst) {
   let res;
   try {
     res = await fetch(`api/agents/${encodeURIComponent(id)}/chat?stream=1`, {
@@ -309,8 +338,10 @@ async function streamChat(body, pending) {
     }
     let data = {};
     try { data = lines.length ? JSON.parse(lines.join("\n")) : {}; } catch { return; }
+    if (!got) onFirst?.();
     got = true;
     if (event === "status") pending.status(data.text);
+    else if (event === "action") pending.action();
     else if (event === "sources") pending.sources(data.citations);
     else if (event === "reply") final = { ok: true, status: 200, data };
     else if (event === "error") final = { ok: false, status: data.error === "ended" ? 410 : data.error === "forbidden" ? 403 : data.error === "not_found" ? 404 : 500, data };
@@ -331,18 +362,23 @@ async function streamChat(body, pending) {
 }
 
 async function sendInner(text, img) {
-  userBubble(text, img);
+  const u = userBubble(text, img);
   const pending = pendingBubble(); chat.append(pending.el); scrollToEnd(chat);
   const body = { text: text || (img ? t().herePhoto : "") };
   if (pick !== "auto") body.lang = pick;
   if (img) body.imageDataUrl = img;
-  const r = (await streamChat(body, pending)) || (await api(`api/agents/${encodeURIComponent(id)}/chat`, body));
-  pending.el.remove();
+  const seen = () => markSeen(u, t().seen);
+  const r = (await streamChat(body, pending, seen)) || (await api(`api/agents/${encodeURIComponent(id)}/chat`, body));
+  pending.done(); pending.el.remove();
   if (r.status === 410) { endHelper(r.data.state, r.data.reply); return; }
   if (r.status === 401) { authLost(); return; }
   if (!r.ok) { helperMessage({ reply: r.data.reply || r.data.error || t().sendFail, refused: !!r.data.reply }); return; }
+  seen();
+  userEls.set(rendered, u);
   rendered += 2;
-  handleReply(r.data);
+  // A write action completed: a check reaction on the message that asked for it.
+  if (r.data?.action && WRITE_ACTIONS.includes(r.data.action.kind)) addReaction(u, t().reactDone);
+  await handleReply(r.data, { animate: true });
 }
 
 const syncSend = () => (sendBtn.disabled = !input.value.trim() && !attached);

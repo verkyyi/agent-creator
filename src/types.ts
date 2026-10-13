@@ -169,9 +169,9 @@ export interface DB {
   findings: Finding[];
   inbox: InboxRec[];
   captures: { id: string; tenantId: string; title: string; text: string; suggestedSharing: Sharing; createdAt: string }[];
-  chatLog: Record<string, { role: "user" | "helper"; text: string; at: string; citations?: Cite[]; action?: { kind: string; summary: string }; via?: "voice"; sessionId?: string; startedAt?: string; endedAt?: string }[]>;
+  chatLog: Record<string, { role: "user" | "helper"; text: string; at: string; citations?: Cite[]; action?: { kind: string; summary: string }; reaction?: "check"; via?: "voice"; sessionId?: string; startedAt?: string; endedAt?: string }[]>;
   drafts: Record<string, CreatorDraft>; // keyed by owner member id
-  creatorLog: Record<string, { role: "owner" | "creator"; text: string; at: string }[]>;
+  creatorLog: Record<string, { role: "owner" | "creator"; text: string; at: string; reaction?: "check" }[]>;
   clockOffsetMs: number;
   // invite token per member id (random per sandbox; see store.ts)
   inviteTokens?: Record<string, string>;
