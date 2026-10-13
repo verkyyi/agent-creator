@@ -27,6 +27,18 @@ async function upload(path, form) {
   } catch { return { ok: false, status: 0, data: { error: ot("cards.noReach") } }; }
 }
 
+/** "Text from CrewBrain number": the server texts the invite from the company number (keeps the sms: link for the owner's own Messages). */
+function smsInviteBtn(agentId, memberId) {
+  const b = h("button", { class: "btn small ghost sms-invite-btn", type: "button", title: ot("cards.textFromCbHint") }, ot("cards.textFromCb"));
+  b.onclick = async () => {
+    b.disabled = true;
+    const r = await api(`api/agents/${encodeURIComponent(agentId)}/sms-invite`, { memberId });
+    if (!r.ok) { b.disabled = false; toast((r.data && (r.data.reply || r.data.error)) || ot("cards.failed"), "err"); return; }
+    b.textContent = ot("cards.texted");
+  };
+  return b;
+}
+
 /* ---------- card renderers ---------- */
 function shareCard(c) {
   const a = c.agent || {}, links = c.links || [];
@@ -41,7 +53,8 @@ function shareCard(c) {
     return h("div", { class: "cb-row cb-line", "data-member": l.memberId },
       h("div", { class: "cb-who" }, h("b", {}, l.name), h("span", { class: "cb-url" }, l.url)),
       h("div", { class: "cb-acts" },
-        h("a", { class: "btn small", href: "sms:?&body=" + encodeURIComponent(ot("cards.smsBody", { n: name, url: l.url })) }, ot("cards.text")), copy));
+        h("a", { class: "btn small", href: "sms:?&body=" + encodeURIComponent(ot("cards.smsBody", { n: name, url: l.url })) }, ot("cards.text")),
+        l.smsReady && a.id ? smsInviteBtn(a.id, l.memberId) : null, copy));
   });
   const rest = links.length - SHOW;
   return add(card("share-card",

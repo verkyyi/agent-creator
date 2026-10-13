@@ -14,6 +14,8 @@ import type { Member } from "./types.ts";
 import { accessLog } from "./access.ts";
 import { llmConfigured } from "./llm.ts";
 import { localize, uiTable } from "./i18n.ts";
+import { smsRoutes } from "./smsroutes.ts";
+import { smsAvailable, smsConfigured, smsSimulator } from "./sms.ts";
 
 type Env = { Variables: { member: Member } };
 
@@ -97,7 +99,7 @@ export function buildApp() {
     return c.json({ identities: db.members.map((m) => ({ name: m.name, role: m.role, description: desc[m.id], url: `${base(c)}i/${inviteToken(m.id)}` })) });
   });
 
-  app.get("/api/health", (c) => c.json({ ok: true, now: now().toISOString(), hydra: hydraState, claude: llmConfigured(), voice: !!process.env.OPENAI_API_KEY }));
+  app.get("/api/health", (c) => c.json({ ok: true, now: now().toISOString(), hydra: hydraState, claude: llmConfigured(), voice: !!process.env.OPENAI_API_KEY, sms: smsConfigured() ? "twilio" : smsSimulator() ? "simulated" : false }));
 
   app.use("/api/*", async (c, next) => {
     if (c.req.path.endsWith("/api/demo/identities") || c.req.path.endsWith("/api/health")) return next();
@@ -127,6 +129,9 @@ export function buildApp() {
   app.post("/api/agents/:id/approve", wrap(async (c) => core.approve(c.get("member"), c.req.param("id")!, Number((await c.req.json()).rev), base(c))));
   app.post("/api/agents/:id/close", wrap((c) => core.closeAgent(c.get("member"), c.req.param("id")!)));
   app.get("/api/agents", wrap((c) => ({ agents: core.helpersFor(c.get("member")) })));
+  app.post("/api/agents/:id/sms-invite", wrap(async (c) => { const b = await c.req.json().catch(() => ({})); return core.smsInvite(c.get("member"), c.req.param("id")!, base(c), typeof b.memberId === "string" ? b.memberId : undefined); }));
+  app.post("/api/members/:id/phone", wrap(async (c) => core.setPhone(c.get("member"), c.req.param("id")!, (await c.req.json().catch(() => ({}))).phone)));
+  app.get("/api/sms", wrap(() => ({ available: smsAvailable(), configured: smsConfigured(), simulator: smsSimulator() })));
   app.get("/api/agents/:id/links", wrap((c) => core.links(c.get("member"), c.req.param("id")!, base(c))));
   app.get("/api/agents/:id/public", wrap((c) => core.publicInfo(c.get("member"), c.req.param("id")!)));
   app.get("/api/agents/:id/history", wrap((c) => core.history(c.get("member"), c.req.param("id")!)));
@@ -202,6 +207,13 @@ export function buildApp() {
   app.route("/api/x", brainRoutes);
   app.route("/api", brainRoutes);
 
+  // SMS: the Twilio webhook (signature-checked, no cookie) and the owner's simulator.
+  app.route("/sms", smsRoutes(base, sessionMember));
+  app.get("/sms.html", async (c, next) => {
+    const m = sessionMember(c);
+    if (!smsSimulator() || m?.role !== "owner") return c.text("Not found", 404);
+    return next();
+  });
   app.use("/*", serveStatic({ root: "./public" }));
   app.get("/", serveStatic({ path: "./public/index.html" }));
 

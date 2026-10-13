@@ -1,7 +1,7 @@
 /* CrewBrain service worker.
  * Every path is relative to the registration scope, so the app works under any sub-path (e.g. /crewbrain/).
  * Bump VERSION whenever the app shell changes. */
-const VERSION = "v-i18n";
+const VERSION = "v-sms";
 const SHELL_CACHE = `crewbrain-shell-${VERSION}`;
 const RUNTIME_CACHE = `crewbrain-runtime-${VERSION}`;
 const API_CACHE = `crewbrain-api-${VERSION}`;
@@ -104,6 +104,7 @@ self.addEventListener("fetch", (event) => {
   const rel = relPath(url);
   if (rel === null) return; // outside our scope
 
+  if (rel.startsWith("sms/")) return; // SMS webhook + simulator: always the network
   if (rel.startsWith("api/")) {
     if (rel.startsWith("api/voice/")) return; // never cache voice
     if (API_GET_PATTERNS.some((re) => re.test(rel))) event.respondWith(apiNetworkFirst(req));
