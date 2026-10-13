@@ -39,7 +39,7 @@ const WARM_SYSTEM = "Follow the instructions given at the top of the user's mess
 type Warm = { send: (text: string) => void; result: Promise<string | null>; born: number };
 const pools = new Map<string, Warm[]>();
 const POOL_SIZE = Number(process.env.CLAUDE_WARM ?? 2);
-const WARM_TTL_MS = 10 * 60_000;
+const WARM_TTL_MS = 4 * 60_000; // retire before an idle session can go stale
 
 function spawnWarm(model: string): Warm {
   let release!: (t: string) => void;
@@ -71,9 +71,18 @@ function takeWarm(model: string): Warm | undefined {
   while (pool.length < POOL_SIZE) pool.push(spawnWarm(model));
   return w;
 }
+function refill() {
+  for (const m of MODELS) {
+    const pool = pools.get(m) ?? [];
+    pools.set(m, pool);
+    for (const w of pool.filter((x) => Date.now() - x.born > WARM_TTL_MS)) { pool.splice(pool.indexOf(w), 1); w.send("Reply with: ok"); }
+    while (pool.length < POOL_SIZE) pool.push(spawnWarm(m));
+  }
+}
 export function prewarm() {
   if (!(process.env.NODE_ENV !== "test" && llmConfigured() && POOL_SIZE > 0)) return;
-  for (const m of MODELS) { const pool = pools.get(m) ?? []; pools.set(m, pool); while (pool.length < POOL_SIZE) pool.push(spawnWarm(m)); }
+  refill();
+  setInterval(refill, 60_000).unref(); // a fresh session is always ready, even after a quiet hour
 }
 
 export async function claude(system: string, prompt: string, opts: { model?: string; timeoutMs?: number; images?: string[] } = {}): Promise<string | null> {
