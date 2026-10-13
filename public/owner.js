@@ -155,7 +155,8 @@ function renderReplyDraft(d) {
     toast(`Sent to ${d.to}`);
     ta.readOnly = true; ta.removeAttribute("id"); sendB.removeAttribute("id");
     card.classList.add("sent");
-    foot.replaceChildren(h("div", { class: "published" }, icon("check"), `Sent to ${d.to}`));
+    foot.replaceChildren(h("div", { class: "published" }, icon("check"), `Sent to ${d.to}`),
+      ...(r.data.brainImproved ? [h("div", { class: "muted brain-improved", "data-testid": "brain-improved" }, "Brain improved: future questions like this will find your answer.")] : []));
     refreshInbox();
   });
   log.append(card); scrollToEnd(log);
@@ -410,6 +411,7 @@ function openInbox(it) {
       if (!r.ok) { answerBtn.disabled = false; answerBtn.textContent = "Send answer"; toast(r.data.error || "Couldn't send your answer. Try again.", "err"); return; }
       closeSheet();
       toast(r.data.knowledge ? `Sent. Also saved to your Brain: ${r.data.knowledge.title}` : "Answer sent.");
+      if (r.data.brainImproved) log.append(h("div", { class: "sys-note brain-improved", "data-testid": "brain-improved" }, "Brain improved: future questions like this will find your answer."));
       await refreshInbox(); renderInbox();
     });
     dismissBtn.addEventListener("click", async () => {

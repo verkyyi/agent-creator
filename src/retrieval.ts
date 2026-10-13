@@ -60,6 +60,11 @@ const dbName = (tenantId: string) => `crewbrain_${tenantId}`;
 export const hydraState: Record<string, "off" | "starting" | "indexing" | "ready" | "error"> = {};
 
 async function hydra(path: string, init: RequestInit & { json?: unknown; form?: FormData } = {}, timeoutMs = 6000) {
+  return (await hydraEnv(path, init, timeoutMs)).data;
+}
+
+// The full envelope: `meta.request_id` is what POST /feedback correlates against.
+async function hydraEnv(path: string, init: RequestInit & { json?: unknown; form?: FormData } = {}, timeoutMs = 6000): Promise<{ data: any; requestId?: string }> {
   const headers: Record<string, string> = { Authorization: `Bearer ${key()}`, "API-Version": "2" };
   let body: BodyInit | undefined;
   if (init.json !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(init.json); }
@@ -67,7 +72,7 @@ async function hydra(path: string, init: RequestInit & { json?: unknown; form?: 
   const r = await fetch(BASE + path, { method: init.method ?? (body ? "POST" : "GET"), headers, body, signal: AbortSignal.timeout(timeoutMs) });
   const j = (await r.json().catch(() => ({}))) as any;
   if (!r.ok || j?.success === false) throw new Error(`hydra ${path} ${r.status} ${JSON.stringify(j?.error ?? j).slice(0, 200)}`);
-  return j?.data ?? j;
+  return { data: j?.data ?? j, requestId: typeof j?.meta?.request_id === "string" ? j.meta.request_id : r.headers?.get?.("x-request-id") ?? undefined };
 }
 
 function docText(s: Source) {
@@ -127,11 +132,15 @@ export async function hydraBoot(tenantId: string, sources: Source[]) {
   }
 }
 
-export async function search(tenantId: string, query: string, sources: Source[], principals: string[], allowedIds: string[]): Promise<{ chunks: Chunk[]; engine: "hydradb" | "local" }> {
+// `requestId` is set whenever HydraDB answered the query (even with nothing usable, so a
+// later escalation can be reported back through POST /feedback); undefined when local only.
+export async function search(tenantId: string, query: string, sources: Source[], principals: string[], allowedIds: string[]): Promise<{ chunks: Chunk[]; engine: "hydradb" | "local"; requestId?: string }> {
   const allowed = sources.filter((s) => allowedIds.includes(s.id));
+  let requestId: string | undefined;
   if (key() && hydraState[tenantId] === "ready") {
     try {
-      const d = await hydra("/query", { json: { database: dbName(tenantId), collection: COLLECTION, query, type: "knowledge", query_by: "hybrid", mode: "fast", max_results: 8, graph_context: false, acl: principals } }, 5000);
+      const { data: d, requestId: rid } = await hydraEnv("/query", { json: { database: dbName(tenantId), collection: COLLECTION, query, type: "knowledge", query_by: "hybrid", mode: "fast", max_results: 8, graph_context: false, acl: principals } }, 5000);
+      requestId = rid;
       const chunks: Chunk[] = [];
       for (const c of d?.chunks ?? []) {
         const src = allowed.find((s) => s.id === (c.id ?? c.source_id)); // second check: approved scope + current lock
@@ -140,10 +149,62 @@ export async function search(tenantId: string, query: string, sources: Source[],
         const text = isDefaultSandbox() ? c.chunk_content : src.sections.find((x) => x.heading === section)?.text ?? "";
         if (text) chunks.push({ sourceId: src.id, title: src.title, section, text, version: src.version, score: c.relevancy_score ?? 0 });
       }
-      if (chunks.length) return { chunks: chunks.slice(0, 4), engine: "hydradb" };
+      if (chunks.length) return { chunks: chunks.slice(0, 4), engine: "hydradb", requestId };
     } catch (e) { console.warn("[hydra] query failed, using local", (e as Error).message); }
   }
-  return { chunks: localSearch(query, sources, principals, allowedIds), engine: "local" };
+  return { chunks: localSearch(query, sources, principals, allowedIds), engine: "local", requestId };
+}
+
+// ---------- feedback loop ----------
+// Fire-and-forget report on a query that fell short (POST /feedback). Resolves to whether
+// HydraDB accepted it; never throws, never retries.
+export async function hydraFeedback(tenantId: string, body: { request_id: string; feedback: string; rating?: "positive" | "negative" | "neutral"; ground_truth?: { answer?: string; source_ids?: string[] } }): Promise<boolean> {
+  if (!key() || !body.request_id) return false;
+  try {
+    await hydra("/feedback", { json: { source: "agent", ...body, database: dbName(tenantId) } }, 5000);
+    return true;
+  } catch (e) {
+    console.warn("[hydra] feedback dropped", (e as Error).message);
+    return false;
+  }
+}
+export const hydraReady = (tenantId: string) => !!key() && hydraState[tenantId] === "ready";
+
+// ---------- graph context (owner view) ----------
+export interface Related { sourceId: string; title: string; relation: string }
+const sourceOfChunk = (chunkId: unknown) => String(chunkId ?? "").replace(/_chunk_\d+$/, "");
+
+// Turn HydraDB's graph slice (chunk_relations + query_paths) into "related" items: each
+// triplet's chunk is mapped back to one of `sources` (anything else is dropped) and labelled
+// with its relation ("42 oak st has access code 5520"). One item per source, at most `max`.
+export function relatedFrom(graph: any, sources: Pick<Source, "id" | "title">[], max = 5): Related[] {
+  const out: Related[] = [];
+  const seen = new Set<string>();
+  for (const p of [...(graph?.chunk_relations ?? []), ...(graph?.query_paths ?? [])]) {
+    for (const t of p?.triplets ?? []) {
+      const src = sources.find((s) => s.id === sourceOfChunk(t?.relation?.chunk_id ?? p?.source_chunk_ids?.[0]));
+      if (!src || seen.has(src.id)) continue;
+      const rel = [t?.source?.name, t?.relation?.canonical_predicate ?? t?.relation?.raw_predicate, t?.target?.name].filter(Boolean).join(" ").trim();
+      if (!rel) continue;
+      seen.add(src.id);
+      out.push({ sourceId: src.id, title: src.title, relation: rel.slice(0, 80) });
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
+}
+
+// Owner-only deep query: thinking mode with the context graph, no acl (the owner sees every
+// lock). Null when HydraDB isn't ready or the call fails; callers fall back to the local index.
+export async function graphQuery(tenantId: string, query: string, sources: Pick<Source, "id" | "title">[]): Promise<{ chunks: any[]; related: Related[]; requestId?: string } | null> {
+  if (!hydraReady(tenantId)) return null;
+  try {
+    const { data: d, requestId } = await hydraEnv("/query", { json: { database: dbName(tenantId), collection: COLLECTION, query, type: "knowledge", query_by: "hybrid", mode: "thinking", max_results: 8, graph_context: true } }, 12000);
+    return { chunks: d?.chunks ?? [], related: relatedFrom(d?.graph_context, sources), requestId };
+  } catch (e) {
+    console.warn("[hydra] graph query failed", (e as Error).message);
+    return null;
+  }
 }
 
 function sectionOf(s: Source, text: string) {

@@ -1,5 +1,5 @@
 import { db, now, record, id, hashConfig, save, inviteToken, isDefaultSandbox } from "./store.ts";
-import { aclFor, hydraIngest, hydraSetAcl, localSearch, principalsFor, search } from "./retrieval.ts";
+import { aclFor, graphQuery, hydraFeedback, hydraIngest, hydraReady, hydraSetAcl, localSearch, principalsFor, search } from "./retrieval.ts";
 import { claude, llmStatus } from "./llm.ts";
 import { remember, recall, forgetAgent } from "./memory.ts";
 import { ask as askBrain } from "./brain.ts";
@@ -148,6 +148,21 @@ function propose(owner: Member, a: Agent, config: AgentConfig, changes?: string[
   return { reply, proposal: p, agent: summary(a) };
 }
 
+// Which job a message names: jobs are the jobIds on the tenant's sources/groups, labelled
+// by the part of a job source's title after the colon ("Install Timeline: 42 Oak St").
+const JOB_STOP = new Set(["st", "street", "ave", "road", "rd", "the", "job", "emails", "brief"]);
+export function jobFromText(tenantId: string, t: string): { id: string; label: string } | undefined {
+  const jobs = new Map<string, string>();
+  for (const s of db.sources) if (s.tenantId === tenantId && s.jobId && !jobs.has(s.jobId)) jobs.set(s.jobId, (/:\s*(.+)$/.exec(s.title)?.[1] ?? s.title).trim());
+  for (const g of db.groups) if (g.tenantId === tenantId && g.jobId && !jobs.has(g.jobId)) jobs.set(g.jobId, g.jobId.replace(/^job_/, ""));
+  const words = new Set(t.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+  for (const [id, label] of jobs) {
+    const keys = [...(label.toLowerCase().match(/[a-z]+/g) ?? []), ...(id.toLowerCase().replace(/^job_/, "").match(/[a-z]+/g) ?? [])].filter((w) => w.length > 2 && !JOB_STOP.has(w));
+    if (keys.some((k) => words.has(k))) return { id, label };
+  }
+  return undefined;
+}
+
 export async function creatorMessage(owner: Member, text: string, base = "./"): Promise<Reply> {
   if (owner.role !== "owner") throw new HttpError(403, { error: "forbidden" });
   log(owner, "owner", text);
@@ -240,6 +255,30 @@ export async function creatorMessage(owner: Member, text: string, base = "./"): 
     return card("Here's the note. Pick who can see it and save.", { type: "knowledge_draft", title: title.charAt(0).toUpperCase() + title.slice(1), text: body.charAt(0).toUpperCase() + body.slice(1), sharing, request: { path: "api/x/ingest/text", bodyBase: {} } });
   }
 
+  // Job status: "What's going on at 42 Oak St?" / "status of the Oak St job". HydraDB's
+  // context graph links the job's documents; offline, the job-tagged sources + open inbox.
+  const job = /\b(what'?s|what is) (going on|happening|up|the (status|latest))\b|\bstatus (of|on|for)\b|\bhow'?s .+ going\b|\bwhere are we (at|on|with)\b/.test(t) ? jobFromText(owner.tenantId, t) : undefined;
+  if (job) {
+    const all = db.sources.filter((x) => x.tenantId === owner.tenantId && owner.sourceScope.includes(x.id));
+    const g = await graphQuery(owner.tenantId, text, all);
+    const results: { sourceId: string; title: string; section: string; text: string; lockLabel: string }[] = [];
+    const push = (s: Source, section: string, body: string) => { if (!results.some((r) => r.sourceId === s.id)) results.push({ sourceId: s.id, title: s.title, section, text: body, lockLabel: brainItem(s).lockLabel }); };
+    for (const ch of g?.chunks ?? []) {
+      const s = all.find((x) => x.id === (ch.id ?? ch.source_id));
+      if (s && (s.jobId === job.id || !s.jobId)) push(s, s.sections[0]?.heading ?? "", s.sections.map((x) => x.text).join(" "));
+    }
+    for (const s of all.filter((x) => x.jobId === job.id)) push(s, s.sections[0]?.heading ?? "", s.sections.map((x) => x.text).join(" "));
+    const waiting = open.filter((i) => { const a = db.agents.find((x) => x.id === i.agentId); return a && cfgOf(a).jobId === job.id; })
+      .map((i) => ({ id: i.id, kind: i.kind, from: memberById(i.fromId)?.name ?? "", text: i.text }));
+    const status = (db.toolData[owner.tenantId]?.["job.status"] as any)?.[job.id];
+    const related = (g?.related ?? []).map(({ title, relation }) => ({ title, relation }));
+    const notes = results.slice(0, 4).map((x, i) => `[${i + 1}] ${x.title}: ${x.text}`).join("\n");
+    const ans = await claude("You brief a contractor owner on one of their jobs from their own company notes, open helper questions and graph links. Two or three short sentences, plain words, spoken style. Only use what is given.",
+      `Job: ${job.label}\n${status ? `Status: ${JSON.stringify(status)}\n` : ""}Notes:\n${notes || "(none)"}\nOpen questions/issues: ${waiting.map((w) => `${w.from}: ${w.text}`).join("; ") || "none"}\nRelated: ${related.map((r) => `${r.title} (${r.relation})`).join("; ") || "none"}\n\nQuestion: ${text}`, { timeoutMs: 15000 });
+    const fallback = `${job.label}: ${status ? `${status.phase}. Next: ${status.next}${status.inspection ? `. Inspection ${status.inspection}` : ""}.` : `${results.length} note${results.length === 1 ? "" : "s"} on file.`}${waiting.length ? ` ${waiting.length} open item${waiting.length === 1 ? "" : "s"} from your helpers.` : " Nothing waiting on you."}`;
+    return card(ans ?? fallback, { type: "answer", job: job.label, results: results.slice(0, 4), open: waiting, ...(related.length ? { related } : {}) });
+  }
+
   // Ask the brain (owner sees everything they own).
   const isQuestion = /\?\s*$/.test(t) || /^(what|how|when|where|who|why|do|does|did|can|is|are|should)\b/.test(t);
   if (isQuestion && !/\b(make|create|brief|helper for)\b/.test(t)) {
@@ -251,7 +290,8 @@ export async function creatorMessage(owner: Member, text: string, base = "./"): 
     if (!results.length) return say("I couldn't find that in your company brain. Want to add it? Say \"Remember …\".");
     const ex = results.slice(0, 3).map((x: any, i: number) => `[${i + 1}] ${x.title} · ${x.section}: ${x.text}`).join("\n");
     const ans = await claude("You answer a contractor owner's question from their own company notes. One or two short sentences, plain words, spoken style. Only use the notes.", `Notes:\n${ex}\n\nQuestion: ${text}`, { timeoutMs: 15000 });
-    return card(ans ?? results[0].text, { type: "answer", results: results.slice(0, 3) });
+    const related = ((r as any).related ?? []) as { title: string; relation: string }[];
+    return card(ans ?? results[0].text, { type: "answer", results: results.slice(0, 3), ...(related.length ? { related: related.slice(0, 5) } : {}) });
   }
 
   // Edits to an existing helper create a new proposal; the approved one stays live meanwhile.
@@ -425,11 +465,11 @@ export async function chat(m: Member, agentId: string, text: string, imageDataUr
 
   const principals = principalsFor(g);
   const allowedIds = c.sources.map((s) => s.id);
-  const { chunks, engine } = await search(a.tenantId, text, db.sources, principals, allowedIds);
+  const { chunks, engine, requestId } = await search(a.tenantId, text, db.sources, principals, allowedIds);
   record({ tenantId: a.tenantId, actorId: m.id, agentId: a.id, kind: "retrieval", detail: { engine, sources: chunks.map((x) => x.sourceId) } });
 
   const escalate = () => {
-    db.inbox.push({ id: id("inb"), tenantId: a.tenantId, kind: "question", agentId: a.id, fromId: m.id, text, status: "open", createdAt: now().toISOString() });
+    db.inbox.push({ id: id("inb"), tenantId: a.tenantId, kind: "question", agentId: a.id, fromId: m.id, text, status: "open", createdAt: now().toISOString(), ...(requestId ? { hydraRequestId: requestId } : {}) });
     const owner = memberById(a.ownerId)!.name.split(" ")[0];
     const es = /[¿¡]|\b(el|la|cuál|qué|dónde|cómo)\b/i.test(text);
     return done({ reply: es ? `Eso no lo puedo ver. Le pasé tu pregunta a ${owner}.` : `That's not something I can see. I've passed your question to ${owner}.`, refused: true });
@@ -535,6 +575,7 @@ export function answerInbox(owner: Member, iid: string, text: string, sharing: S
   // The person who asked hears back in their own chat.
   (db.chatLog[`${i.agentId}:${i.fromId}`] ??= []).push({ role: "helper", text, at: now().toISOString(), action: { kind: "owner_answer", summary: text } });
   let knowledge;
+  let brainImproved = false;
   if (i.kind === "question") {
     // Only an authorized human turns a conversation into company knowledge.
     const s: Source = { id: id("src"), tenantId: owner.tenantId, title: `Answer: ${i.text.slice(0, 60)}`, category: "faq", version: 1, sharing, origin: "answer", updatedAt: now().toISOString(), sections: [{ heading: i.text, text }] };
@@ -550,10 +591,22 @@ export function answerInbox(owner: Member, iid: string, text: string, sharing: S
     }
     void hydraIngest(owner.tenantId, [s]).catch((e) => console.warn("[hydra] ingest", e.message));
     knowledge = brainItem(s);
+    // Close the loop: tell HydraDB which query fell short and what the right answer was.
+    if (i.hydraRequestId && hydraReady(owner.tenantId)) {
+      const helper = a ? cfgOf(a).name : "A helper";
+      const tenantId = owner.tenantId;
+      brainImproved = true;
+      void hydraFeedback(tenantId, {
+        request_id: i.hydraRequestId, rating: "negative",
+        feedback: `${helper} could not answer '${i.text}'; owner supplied the answer, now stored as source ${s.id}`,
+        ground_truth: { answer: text, source_ids: [s.id] },
+      }).then((ok) => record({ tenantId, actorId: owner.id, kind: "hydra.feedback", detail: { inbox: iid, requestId: i.hydraRequestId, sourceId: s.id, ok } }))
+        .catch(() => {});
+    }
   }
   record({ tenantId: owner.tenantId, actorId: owner.id, kind: "inbox.answered", detail: { id: iid } });
   save();
-  return { item: inbox(owner).items.find((x) => x.id === iid), knowledge };
+  return { item: inbox(owner).items.find((x) => x.id === iid), knowledge, ...(brainImproved ? { brainImproved } : {}) };
 }
 
 export function dismissInbox(owner: Member, iid: string) {
