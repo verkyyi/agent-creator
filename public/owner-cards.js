@@ -1,5 +1,5 @@
 // Inline chat cards for the owner's chat with Crewbrain, plus the composer's attach menu.
-import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, scrollToEnd, sourcesToggle } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, showOnSite, scrollToEnd, sourcesToggle } from "./common.js";
 
 let ctx;
 const $ = (s) => document.querySelector(s);
@@ -29,20 +29,26 @@ function shareCard(c) {
   const a = c.agent || {}, links = c.links || [];
   const name = a.name || "your helper";
   const openAll = () => shareSheet(links, { title: `Send ${name}`, helperName: name, endsLabel: a.endsLabel || "", job: a.job || "" });
-  const rows = links.map((l) => {
+  const SHOW = 2;
+  const rows = links.slice(0, SHOW).map((l) => {
     const copy = h("button", { class: "btn small ghost", type: "button", onclick: async () => {
       let ok = false; try { await navigator.clipboard.writeText(l.url); ok = true; } catch {}
       copy.textContent = ok ? "Copied" : "Hold to copy"; setTimeout(() => (copy.textContent = "Copy"), 1600);
     } }, "Copy");
-    return h("div", { class: "cb-row", "data-member": l.memberId },
+    return h("div", { class: "cb-row cb-line", "data-member": l.memberId },
       h("div", { class: "cb-who" }, h("b", {}, l.name), h("span", { class: "cb-url" }, l.url)),
       h("div", { class: "cb-acts" },
         h("a", { class: "btn small", href: "sms:?&body=" + encodeURIComponent(`Here's your link for ${name}: ${l.url}`) }, "Text"), copy));
   });
+  const rest = links.length - SHOW;
   return add(card("share-card",
     head("share", `Send ${name}`, a.endsLabel ? h("span", { class: "cb-sub" }, `Works until ${a.endsLabel}`) : null),
-    links.length ? h("div", { class: "cb-rows" }, rows) : h("p", { class: "cb-muted" }, "No links yet. Approve the helper first."),
-    links.length ? h("button", { class: "btn yellow block open-share-btn", type: "button", onclick: openAll }, h("span", { html: ICON.share, style: "display:inline-flex" }), "Open share options") : null));
+    links.length ? h("div", { class: "cb-rows" }, rows,
+      rest > 0 ? h("button", { class: "cb-more", type: "button", onclick: openAll }, `and ${rest} more`) : null)
+      : h("p", { class: "cb-muted" }, "No links yet. Approve the helper first."),
+    links.length ? h("div", { class: "cb-btnrow" },
+      h("button", { class: "btn yellow open-share-btn", type: "button", onclick: openAll }, h("span", { html: ICON.share, style: "display:inline-flex" }), "Send to everyone"),
+      h("button", { class: "btn ghost qr-card-btn", type: "button", "aria-label": "Show QR codes", onclick: () => links.length === 1 ? showOnSite(links[0], name) : openAll() }, h("span", { html: ICON.qr, style: "display:inline-flex" }), "QR")) : null));
 }
 
 function helpersCard(c) {
@@ -62,16 +68,21 @@ function helpersCard(c) {
         h("a", { class: "btn small ghost", href: `a.html?id=${encodeURIComponent(a.id)}` }, "Open chat"),
         !ended ? h("button", { class: "btn small ghost", type: "button", onclick: () => ctx.sendCreator(`Close ${a.name}`) }, "Close") : null));
   });
+  const MAX = 4;
+  rows.slice(MAX).forEach((r) => (r.hidden = true));
+  const all = rows.length > MAX ? h("button", { class: "cb-more", type: "button", "aria-expanded": "false", onclick: () => {
+    rows.forEach((r) => (r.hidden = false)); all.remove();
+  } }, `Show all ${rows.length}`) : null;
   return add(card("helpers-card", head("helpers", list.length ? `Your helpers (${list.length})` : "Your helpers"),
-    list.length ? h("div", { class: "cb-rows" }, rows) : h("p", { class: "cb-muted" }, "No helpers yet. Say who needs one.")));
+    list.length ? h("div", { class: "cb-rows" }, rows, all) : h("p", { class: "cb-muted" }, "No helpers yet. Say who needs one.")));
 }
 
 function confirmCard(c) {
-  const go = h("button", { class: "btn block " + (c.danger ? "danger" : "yellow"), type: "button" }, c.confirmLabel || "Yes, do it");
-  const cancel = h("button", { class: "btn ghost block", type: "button" }, "Cancel");
-  const foot = h("div", { class: "cb-foot" }, go, cancel);
+  const go = h("button", { class: "btn " + (c.danger ? "danger" : "yellow"), type: "button" }, c.confirmLabel || "Yes, do it");
+  const cancel = h("button", { class: "btn ghost", type: "button" }, "Cancel");
+  const foot = h("div", { class: "cb-foot cb-foot-row" }, go, cancel);
   const el = add(card("confirm-card" + (c.danger ? " danger" : ""), head(c.danger ? "power" : "check", c.title || "Are you sure?"),
-    c.body ? h("p", {}, c.body) : null, foot));
+    c.body ? h("p", { class: "cb-line1", title: c.body }, c.body) : null, foot));
   cancel.onclick = () => { foot.replaceChildren(h("div", { class: "cb-muted" }, "Cancelled. Nothing changed.")); el.classList.add("done"); };
   go.onclick = async () => {
     go.disabled = true; cancel.disabled = true; const label = go.textContent; go.textContent = "Working on it…";
@@ -88,27 +99,35 @@ function confirmCard(c) {
   return el;
 }
 
-/** Editable knowledge card. save({title,text,sharing}) -> api result. */
+/** Editable knowledge card, compact: title + 2-line preview; "Edit" opens the fields. save({title,text,sharing}) -> api result. */
 function knowledgeCard({ heading = "Check before saving", title = "", text = "", sharing = "internal", imageUrl, save }) {
   const t = h("input", { type: "text", "aria-label": "Title", class: "cb-input" }); t.value = title;
-  const x = h("textarea", { "aria-label": "What it says", class: "cb-input", rows: 5 }); x.value = text;
+  const x = h("textarea", { "aria-label": "What it says", class: "cb-input", rows: 4 }); x.value = text;
   const picker = lockPicker(sharing);
+  picker.el.classList.add("seg");
+  const pvT = h("b", { class: "kc-title" }, title || "Untitled");
+  const pvX = h("p", { class: "kc-text" }, text);
+  const fields = h("div", { class: "kc-fields", hidden: true },
+    h("label", { class: "cb-label" }, "Title", t),
+    h("label", { class: "cb-label" }, "What it says", x));
+  const edit = h("button", { class: "kc-edit", type: "button", "aria-expanded": "false" }, "Edit");
+  const preview = h("div", { class: "kc-preview" }, h("div", { class: "kc-top" }, pvT, edit), pvX);
+  edit.onclick = () => { preview.hidden = true; fields.hidden = false; x.focus(); };
   const btn = h("button", { class: "btn yellow block save-knowledge-btn", type: "button" }, "Save to brain");
   const foot = h("div", { class: "cb-foot" }, btn);
   const el = add(card("knowledge-card", head("brain", heading),
     imageUrl ? h("img", { class: "cb-photo", src: imageUrl, alt: "Your photo" }) : null,
-    h("p", { class: "cb-muted" }, "Fix anything that's wrong. Helpers can't use it until you save it."),
-    h("label", { class: "cb-label" }, "Title", t),
-    h("label", { class: "cb-label" }, "What it says", x),
+    preview, fields,
     h("div", { class: "cb-label" }, "Who can see this", picker.el),
     foot));
   btn.onclick = async () => {
     const vals = { title: t.value.trim(), text: x.value, sharing: picker.value };
-    if (!vals.text.trim()) { x.focus(); return; }
+    if (!vals.text.trim()) { edit.click(); return; }
     btn.disabled = true; btn.textContent = "Saving…";
     const r = await save(vals);
     if (!r.ok) { btn.disabled = false; btn.textContent = "Save to brain"; toast(r.data.error || "Couldn't save. Try again.", "err"); return; }
     t.readOnly = x.readOnly = true; picker.el.classList.add("locked");
+    pvT.textContent = vals.title || "Untitled"; pvX.textContent = vals.text; fields.hidden = true; preview.hidden = false; edit.remove();
     el.classList.add("done");
     const lbl = r.data.item?.lockLabel || lockLabel(vals.sharing);
     foot.replaceChildren(h("div", { class: "published" }, icon("check"), `Saved · ${lbl}`));
@@ -227,6 +246,7 @@ async function onPhoto(file) {
 function onFile(file) {
   const t = h("input", { type: "text", class: "cb-input", "aria-label": "Title" }); t.value = file.name.replace(/\.[^.]+$/, "");
   const picker = lockPicker("internal");
+  picker.el.classList.add("seg");
   const btn = h("button", { class: "btn yellow block", type: "button" }, "Save to brain");
   const foot = h("div", { class: "cb-foot" }, btn);
   const el = add(card("knowledge-card file-card", head("doc", file.name),

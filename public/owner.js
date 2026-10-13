@@ -75,6 +75,10 @@ const log = $("#creator-log");
 const input = $("#composer-input");
 const sendBtn = $("#send-btn");
 input.addEventListener("input", () => (sendBtn.disabled = !input.value.trim()));
+/* Cards cap themselves at 2/3 of the chat scroller (see --card-max in app.css). */
+const setChatH = () => { if (log.clientHeight) document.documentElement.style.setProperty("--chat-h", log.clientHeight + "px"); };
+if (window.ResizeObserver) new ResizeObserver(setChatH).observe(log);
+setChatH();
 
 function bubble(role, text) {
   const out = role === "owner" || role === "user";
@@ -137,6 +141,7 @@ $("#composer").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = input.value.trim(); if (!text) return;
   input.value = ""; sendBtn.disabled = true;
+  if (input.dataset.ph != null) { input.setAttribute("placeholder", input.dataset.ph); delete input.dataset.ph; }
   sendCreator(text);
 });
 
@@ -214,43 +219,88 @@ function renderReplyDraft(d, target = log) {
   target.append(card); scrollToEnd(log);
 }
 
-/* ---------- approval card ---------- */
-function acRow(k, v, cls = "") { return h("div", { class: "ac-row " + cls }, h("div", { class: "k" }, k), h("div", { class: "v" }, v)); }
-const list = (arr, fn, none = "Nothing") => (arr && arr.length ? h("ul", {}, arr.map((x) => h("li", {}, fn(x)))) : h("span", { class: "muted" }, none));
+/* ---------- approval card ----------
+   Compact by default: header, one-line summary, three pills that expand one list inline, ends line, buttons.
+   An edit (p.changes) shows only what changed. */
+const HELPER_KIND = { crew_briefing: "Crew briefing", homeowner_helper: "Homeowner helper" };
+const kindLabel = (p) => HELPER_KIND[p.templateId] || (helperAvatar(p) === "hardhat" ? "Crew briefing" : "Homeowner helper");
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+let acSeq = 0;
+const CHANGE_HINT = "e.g. end it Saturday instead";
+
+function acPills(p) {
+  const id = `ac-${++acSeq}`;
+  const ul = (items) => h("ul", { class: "ac-list" }, items.map((x) => h("li", {}, x)));
+  const tools = [...(p.canCheck || []), ...(p.canDo || [])].map((t) => t.name);
+  const lists = [
+    { key: "knows", ico: "brain", label: "Knows", n: (p.knows || []).length,
+      body: () => (p.knows || []).length ? ul(p.knows.map((k) => k.title)) : h("p", { class: "muted" }, "Nothing yet") },
+    { key: "can", ico: "check", label: "Can do", n: tools.length,
+      body: () => [tools.length ? ul(tools) : h("p", { class: "muted" }, "Only answer questions"),
+        h("p", { class: "ac-esc" }, icon("question"), h("span", {}, `Questions go to ${p.escalation || "you"}`))] },
+    { key: "cant", ico: "lock", label: "Can't see", n: (p.cantSee || []).length,
+      body: () => (p.cantSee || []).length ? h("ul", { class: "ac-list ac-cant" }, p.cantSee.map((t) => h("li", {}, icon("lock"), h("span", {}, t)))) : h("p", { class: "muted" }, "Nothing held back") },
+  ];
+  const panel = h("div", { class: "ac-panel", id: id + "-panel", role: "region", hidden: true });
+  const btns = lists.map((l) => h("button", { class: "ac-pill", type: "button", "data-list": l.key, "aria-expanded": "false", "aria-controls": id + "-panel" },
+    icon(l.ico), h("span", {}, `${l.label} ${l.n}`)));
+  btns.forEach((b, i) => b.addEventListener("click", () => {
+    const open = b.getAttribute("aria-expanded") !== "true";
+    btns.forEach((x) => x.setAttribute("aria-expanded", "false"));
+    panel.replaceChildren();
+    panel.hidden = !open;
+    if (open) { b.setAttribute("aria-expanded", "true"); panel.setAttribute("aria-label", lists[i].label); panel.append(...[lists[i].body()].flat()); }
+  }));
+  return [h("div", { class: "ac-pills", role: "group", "aria-label": "Details" }, btns), panel];
+}
+
+function askForChange() {
+  const ph = input.getAttribute("placeholder");
+  if (!input.dataset.ph) input.dataset.ph = ph || "";
+  input.setAttribute("placeholder", CHANGE_HINT);
+  const restore = () => { input.removeEventListener("blur", onBlur); if (input.dataset.ph == null) return; input.setAttribute("placeholder", input.dataset.ph); delete input.dataset.ph; };
+  const onBlur = () => { if (!input.value.trim()) restore(); };
+  input.addEventListener("blur", onBlur);
+  input.focus();
+}
 
 function renderProposal(p, target = log) {
   const helper = state.helpers.find((x) => x.id === p.agentId);
   const published = helper && helper.activeRev != null && helper.activeRev >= p.rev;
-  const card = h("div", { class: "approval-card" + (published ? " done" : ""), "data-agent": p.agentId, "data-rev": p.rev });
-  card.append(
-    h("div", { class: "ac-head" },
-      h("div", { class: "ac-helper" }, avatar(helperAvatar(p)), h("div", { style: "min-width:0" }, h("h3", {}, p.name), p.job ? h("div", { class: "ac-job" }, p.job) : null)),
-      published ? h("span", { class: "pill active" }, "Live") : h("span", { class: "pill awaiting" }, "Waiting for your OK")),
-    ...(p.changes?.length ? [acRow("What changed", list(p.changes, (c) => c), "ac-changes")] : []),
-    acRow("Who can use it", h("span", {}, h("b", {}, p.audience?.name || "Nobody yet"), p.audience ? ` · ${p.audience.count} ${p.audience.count === 1 ? "person" : "people"}` : "")),
-    acRow("What it knows", list(p.knows, (k) => k.title)),
-    acRow("What it can check", list(p.canCheck, (t) => t.name)),
-    acRow("What it can do", list(p.canDo, (t) => t.name, "Only answer questions")),
-    acRow("What it can't see", list(p.cantSee, (t) => [h("span", { class: "no-ico" }, icon("lock")), t]), "ac-cant"),
-    acRow("Ends", h("span", { class: "ac-ends" }, p.endsLabel || p.endsAt)),
-    acRow("Questions go to", p.escalation || "You"),
-  );
+  const card = h("div", { class: "approval-card" + (published ? " done" : "") + (p.changes?.length ? " is-edit" : ""), "data-agent": p.agentId, "data-rev": p.rev });
+  const aud = p.audience;
+  const summary = (p.summary || p.job || "").trim();
+  const head = h("div", { class: "ac-head" },
+    avatar(helperAvatar(p)),
+    h("div", { class: "ac-title" },
+      h("h3", {}, h("span", { class: "ac-name" }, p.name), h("span", { class: "ac-kind" }, ` · ${kindLabel(p)}`)),
+      h("div", { class: "ac-aud" }, aud ? `${aud.name} · ${plural(aud.count, "person", "people")}` : "Nobody yet")),
+    published ? h("span", { class: "pill active" }, "Live") : null);
+  const body = h("div", { class: "ac-body" });
+  if (p.changes?.length) {
+    body.append(h("div", { class: "ac-k" }, "What changed"), h("ul", { class: "ac-list ac-changes" }, p.changes.map((c) => h("li", {}, c))));
+  } else {
+    if (summary) body.append(h("p", { class: "ac-summary" }, summary));
+    body.append(...acPills(p),
+      h("p", { class: "ac-ends" }, icon("clock"), h("span", {}, `Ends ${p.endsLabel || p.endsAt || ""}`)));
+  }
   const foot = h("div", { class: "ac-foot" });
-  card.append(foot);
+  card.append(head, body, foot);
   const showPublished = () => {
     foot.innerHTML = "";
     card.classList.add("done");
     foot.append(h("div", { class: "published" }, icon("check"), "Live. Links are ready to send."),
-      h("button", { class: "btn ghost", type: "button", onclick: () => openLinks(p.agentId, p.name) }, ICON_SHARE(), "Send the links again"));
+      h("button", { class: "btn ghost small", type: "button", onclick: () => openLinks(p.agentId, p.name) }, ICON_SHARE(), "Send the links again"));
   };
   if (published) showPublished();
   else {
     document.querySelectorAll("#approve-btn").forEach((b) => b.removeAttribute("id"));
     const btn = h("button", { class: "btn yellow", id: "approve-btn", type: "button" }, "Approve and send links");
+    const change = h("button", { class: "ac-change", type: "button", onclick: askForChange }, "Change…");
     btn.addEventListener("click", async () => {
-      btn.disabled = true; btn.textContent = "Turning it on…";
+      btn.disabled = true; change.disabled = true; btn.textContent = "Turning it on…";
       const r = await api(`api/agents/${encodeURIComponent(p.agentId)}/approve`, { rev: p.rev });
-      if (!r.ok) { btn.disabled = false; btn.textContent = "Approve and send links"; toast(r.data.error || "Couldn't turn it on. Try again in a moment.", "err"); return; }
+      if (!r.ok) { btn.disabled = false; change.disabled = false; btn.textContent = "Approve and send links"; toast(r.data.error || "Couldn't turn it on. Try again in a moment.", "err"); return; }
       if (r.data.agent) upsertHelper({ ...r.data.agent, job: jobHint(p) });
       btn.removeAttribute("id");
       showPublished();
@@ -259,7 +309,7 @@ function renderProposal(p, target = log) {
       if (r.data.links?.length) renderCard({ type: "share", agent: { ...(r.data.agent || {}), name: r.data.agent?.name || p.name, job: jobHint(p) }, links: r.data.links });
       shareSheet(r.data.links || [], { title: `Send ${p.name}`, helperName: r.data.agent?.name || p.name, endsLabel: r.data.agent?.endsLabel || p.endsLabel, job: jobHint(p) });
     });
-    foot.append(h("p", { class: "ac-note" }, "Nothing goes live until you tap this."), btn);
+    foot.append(btn, change);
   }
   target.append(card);
   scrollToEnd(log);

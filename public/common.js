@@ -184,7 +184,7 @@ function btnI(svg, label, attrs = {}) {
 }
 
 /** Full-screen "Show on site" QR view. */
-async function showOnSite(l, helperName) {
+export async function showOnSite(l, helperName) {
   const img = h("img", { alt: `QR code for ${l.name}'s link`, class: "onsite-qr" });
   let lock = null;
   const close = () => { view.remove(); document.removeEventListener("keydown", onKey, true); try { lock && lock.release(); } catch {} };
@@ -421,9 +421,14 @@ export function voiceCard(summary, { texts, agentId, actionLabel } = {}) {
     toggle.setAttribute("aria-expanded", String(open));
     toggle.firstChild.textContent = open ? T.hideTranscript : T.showTranscript;
   });
+  const MAX = 3;
+  results.slice(MAX).forEach((li) => (li.hidden = true));
+  const more = results.length > MAX ? h("button", { class: "vc-more", type: "button", "aria-expanded": "false", onclick: () => {
+    results.slice(MAX).forEach((li) => (li.hidden = false)); more.remove();
+  } }, `+${results.length - MAX} more`) : null;
   return h("div", { class: "voice-card", "data-testid": "voice-card", "data-session": summary.sessionId || "" },
     h("div", { class: "vc-head" }, icon("mic"), h("b", {}, T.conversation), h("span", { class: "vc-meta mono" }, `${dur} · ${T.turns(n)}`)),
-    results.length ? [h("div", { class: "vc-label" }, T.results), h("ul", { class: "vc-results" }, results)] : null,
+    results.length ? [h("div", { class: "vc-label" }, T.results), h("ul", { class: "vc-results" }, results), more] : null,
     lines.length ? [toggle, tr] : null);
 }
 
