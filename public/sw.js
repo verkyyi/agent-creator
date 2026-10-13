@@ -1,7 +1,7 @@
 /* Crewbrain service worker.
  * Every path is relative to the registration scope, so the app works under any sub-path (e.g. /crewbrain/).
  * Bump VERSION whenever the app shell changes. */
-const VERSION = "v2-2026-10-12-chat";
+const VERSION = "v3-2026-10-13-icons";
 const SHELL_CACHE = `crewbrain-shell-${VERSION}`;
 const RUNTIME_CACHE = `crewbrain-runtime-${VERSION}`;
 const API_CACHE = `crewbrain-api-${VERSION}`;
@@ -16,6 +16,7 @@ const SHELL = [
   "offline.html",
   "app.css",
   "common.js",
+  "icons.js",
   "owner.js",
   "owner-cards.js",
   "agent.js",

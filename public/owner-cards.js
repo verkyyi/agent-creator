@@ -1,5 +1,5 @@
-// Inline chat cards for the owner's chat with Crewbrain, plus the composer's 📎 attach menu.
-import { api, h, toast, ICON, icon, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, scrollToEnd } from "./common.js";
+// Inline chat cards for the owner's chat with Crewbrain, plus the composer's attach menu.
+import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, LOCKS, openSheet, shareSheet, scrollToEnd } from "./common.js";
 
 let ctx;
 const $ = (s) => document.querySelector(s);
@@ -53,7 +53,7 @@ function helpersCard(c) {
     const ended = a.state === "expired" || a.state === "revoked";
     const live = a.state === "active";
     return h("div", { class: "cb-row cb-helper" + (ended ? " ended" : ""), "data-id": a.id },
-      h("div", { class: "cb-hl" }, h("span", { class: "avatar light" }, a.avatar || "🤖"),
+      h("div", { class: "cb-hl" }, avatar(helperAvatar(a)),
         h("div", { class: "cb-who" }, h("b", {}, a.name),
           h("span", { class: "cb-muted" }, [a.audienceName ? `For ${a.audienceName}` : null, a.endsLabel ? (ended ? `Ended ${a.endsLabel}` : `Ends ${a.endsLabel}`) : null].filter(Boolean).join(" · "))),
         h("span", { class: "pill " + pc }, pt)),

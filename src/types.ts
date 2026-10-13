@@ -3,7 +3,9 @@
 export type Role = "owner" | "customer";
 // customer: may reach homeowners; crew: subs and crew only; internal: never leaves the owner.
 export type Sharing = "customer" | "crew" | "internal";
-export type AgentState = "draft" | "awaiting_approval" | "active" | "expired" | "revoked";
+/** A helper's avatar is an icon key, never an emoji (old stores may still hold the former emoji; the UI maps those). */
+export type AvatarKey = "house" | "hardhat";
+export type AgentState ="draft" | "awaiting_approval" | "active" | "expired" | "revoked";
 
 export interface Tenant {
   id: string;
@@ -60,14 +62,14 @@ export interface Template {
   audienceKind: "household" | "crew";
   allowedSharing: Sharing[];
   tools: string[];
-  defaults: { name: string; avatar: string; tone: string; expiryHint: string };
+  defaults: { name: string; avatar: AvatarKey; tone: string; expiryHint: string };
 }
 
 export interface AgentConfig {
   job: string;
   audienceGroupId: string;
   name: string;
-  avatar: string;
+  avatar: string; // AvatarKey; string for sandboxes saved before the switch from emoji
   tone: string;
   sources: { id: string; version: number }[];
   tools: string[];

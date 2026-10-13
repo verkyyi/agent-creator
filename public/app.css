@@ -586,3 +586,10 @@ textarea.cb-input { resize: vertical; min-height: 110px; }
 /* Owner's approval card for a crew → household update. */
 .relay-card .relay-text { width: 100%; min-height: 96px; resize: vertical; }
 .cb-warn { margin: 0; color: var(--deny); font-size: .9rem; font-weight: 600; }
+
+/* ---------- helper avatars: a rounded tile + line icon, colored by audience ---------- */
+.avatar[data-avatar] { border-radius: 28%; }
+.avatar[data-avatar] svg { width: 58%; height: 58%; }
+.avatar.av-house[data-avatar] { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, var(--paper, #fff)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ok) 45%, transparent); }
+.avatar.av-hardhat[data-avatar] { color: var(--tag-ink); background: var(--tag); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tag-ink) 18%, transparent); }
+.chev svg, .id-btn .go svg { width: 20px; height: 20px; display: block; }

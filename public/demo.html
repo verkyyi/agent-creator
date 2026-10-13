@@ -31,19 +31,15 @@
   <div id="ids" class="id-list"><div class="reading"><div class="spinner"></div>Loading…</div></div>
 </div>
 <script type="module">
-import { api, h, ICON } from "./common.js";
+import { api, h, ICON, avatar } from "./common.js";
 const CARDS = [
   { match: /^sam/i, avatar: "owner", title: "Sam", sub: "The owner", d: "Run the company. Make helpers, approve them, close jobs.", primary: true },
-  { match: /^anita/i, avatar: "🏡", title: "Anita", sub: "Homeowner", d: "Ask about her new solar and battery install." },
-  { match: /^marco/i, avatar: "🦺", title: "Marco", sub: "Roofing crew", d: "Gets the job briefing on site. Try Spanish." },
+  { match: /^anita/i, avatar: "house", title: "Anita", sub: "Homeowner", d: "Ask about her new solar and battery install." },
+  { match: /^marco/i, avatar: "hardhat", title: "Marco", sub: "Roofing crew", d: "Gets the job briefing on site. Try Spanish." },
   { match: /^zed/i, avatar: "deny", title: "Zed", sub: "Not invited", d: "See the helper refuse someone it wasn't made for." },
   { match: /^gail/i, avatar: "other", title: "Gail", sub: "Another company", d: "Owns a different company, so she sees nothing of Sam's." },
 ];
-const SVG = {
-  owner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h16v10H4z"/><path d="M9 9V6h6v3M4 13h16"/></svg>',
-  deny: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/></svg>',
-  other: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20V8l6-4v16M10 20h10V10h-10M13 13h4M13 16h4"/></svg>',
-};
+const SVG = { owner: ICON.owner, deny: ICON.deny, other: ICON.company };
 const rel = (u) => { const m = /\/(i\/[^/?#]+)/.exec(u || ""); return m ? m[1] : u; };
 const el = document.getElementById("ids");
 const r = await api("api/demo/identities");
@@ -53,11 +49,11 @@ if (!ids.length) el.append(h("div", { class: "empty" }, "The demo people aren't 
 for (const c of CARDS) {
   const i = ids.find((x) => c.match.test(x.name));
   if (!i) continue;
-  const av = SVG[c.avatar] ? h("span", { class: "avatar lg light role ico-av " + c.avatar, html: SVG[c.avatar] }) : h("span", { class: "avatar lg light role" }, c.avatar);
+  const av = SVG[c.avatar] ? h("span", { class: "avatar lg light role ico-av " + c.avatar, html: SVG[c.avatar] }) : avatar(c.avatar, "lg role");
   el.append(h("a", { class: "id-btn" + (c.primary ? " primary" : ""), href: rel(i.url), "data-role": i.role, "data-testid": "identity" },
     av,
     h("b", {}, c.title, h("small", {}, c.sub)),
-    h("span", { class: "go", "aria-hidden": "true" }, "→"),
+    h("span", { class: "go", "aria-hidden": "true", html: ICON.arrow }),
     h("span", { class: "d" }, c.d)));
 }
 </script>

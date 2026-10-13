@@ -16,7 +16,7 @@ Small trade contractors (solar, electrical, roofing, HVAC, plumbing) answer the 
 ## What it does
 - **A governed company brain.** Everything the company knows (Drive docs, Gmail threads, photos of warranty cards, approved answers) sits in one place, and **every item carries a lock**: Homeowners, Crew for a specific job, or Office only.
 - **A creator agent you talk to.** "Make a helper for the Patels about their install, keep it until 30 days after handover." It asks only for what's missing, then shows an approval card: who can use it, exactly what it knows, what it can't see, what it can do, and when it ends. Nothing is live until the owner taps Approve; the approval is bound to that exact revision.
-- **Scoped helpers.** *Juno* 🏡 answers the Patel household with sources. *Rex* 🦺 briefs the Bay Roofing crew, by voice and in Spanish if they prefer, from English documents.
+- **Scoped helpers.** *Juno* answers the Patel household with sources. *Rex* briefs the Bay Roofing crew, by voice and in Spanish if they prefer, from English documents.
 - **Agents that take actions.** Rex logs a job-site issue with a photo to the owner's inbox. Juno requests a walkthrough. Questions a helper can't answer go to the owner; an answer the owner approves becomes a new knowledge version (nothing is learned automatically).
 - **Access that ends.** "Close the job" kills Rex mid-conversation, and the site brief with the gate code locks back to Office only. Every request checks expiry against server time.
 

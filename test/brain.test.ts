@@ -30,7 +30,7 @@ function addRex(sourceIds: string[], state: Agent["state"] = "active") {
   const a: Agent = {
     id: "agt_rex", tenantId: "rivera", ownerId: "sam", templateId: "crew_briefing", state, activeRev: 1,
     revisions: [{ rev: 1, createdAt: new Date().toISOString(), config: {
-      job: "42 Oak St", audienceGroupId: "grp_bay_crew_oak", name: "Rex", avatar: "🦺", tone: "direct", jobId: "job_oak42",
+      job: "42 Oak St", audienceGroupId: "grp_bay_crew_oak", name: "Rex", avatar: "hardhat", tone: "direct", jobId: "job_oak42",
       sources: sourceIds.map((id) => ({ id, version: 1 })), tools: [], escalationMemberId: "sam",
       expiresAt: new Date(Date.now() + 86400_000).toISOString(), timeZone: "America/Los_Angeles" } }],
   };
