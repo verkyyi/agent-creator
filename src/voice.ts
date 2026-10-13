@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HttpError } from "./core.ts";
-import { agentVoiceContext, appendTranscript, runVoiceTool } from "./voicetools.ts";
+import { agentVoiceContext, appendTranscript, endVoiceSession, runVoiceTool } from "./voicetools.ts";
 import type { Member } from "./types.ts";
 
 // OpenAI Realtime (GA) — speech-to-speech over WebRTC from the browser.
@@ -245,5 +245,13 @@ voiceRoutes.post("/transcript", async (c) => {
   if (!m) return c.json({ error: "unauthenticated", reply: "Open your personal link again." }, 401);
   const b = await body(c);
   if (typeof b.agentId !== "string" || (b.role !== "user" && b.role !== "helper") || typeof b.text !== "string") return c.json({ error: "bad_request" }, 400);
-  try { return c.json(appendTranscript(m, b.agentId, b.role, b.text)); } catch (e) { return fail(c, e); }
+  try { return c.json(appendTranscript(m, b.agentId, b.role, b.text, { sessionId: b.sessionId, startedAt: b.startedAt })); } catch (e) { return fail(c, e); }
+});
+
+voiceRoutes.post("/end", async (c) => {
+  const m = member(c);
+  if (!m) return c.json({ error: "unauthenticated", reply: "Open your personal link again." }, 401);
+  const b = await body(c);
+  if (typeof b.agentId !== "string") return c.json({ error: "bad_request" }, 400);
+  try { return c.json(endVoiceSession(m, b.agentId, b.sessionId)); } catch (e) { return fail(c, e); }
 });

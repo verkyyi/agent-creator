@@ -1,5 +1,5 @@
 import { api, h, toast, ICON, icon, avatar, helperAvatar, downscale, lockChip, lockPicker, openSheet, closeSheet, shareSheet, wireVoice, scrollToEnd, typingBubble, originBadge, fmtDate, store } from "./common.js";
-import { install as installCards, renderCard, relayCard } from "./owner-cards.js";
+import { install as installCards, renderCard, renderCardInto, relayCard } from "./owner-cards.js";
 
 const $ = (s) => document.querySelector(s);
 const state = { me: null, helpers: [], brain: [], inbox: [] };
@@ -125,11 +125,48 @@ $("#composer").addEventListener("submit", (e) => {
   sendCreator(text);
 });
 
+/* Voice: a full-screen overlay; no bubbles while it's live. Cards that need a tap open as a sheet
+   inside the overlay, and the same card node moves into the chat (after the voice card) at the end. */
+const TAP_CARDS = ["confirm", "relays", "knowledge_draft"];
+const voiceTapNodes = new Map();
+function voiceTapCard(j) {
+  if (!j.proposal && !j.replyDraft && !TAP_CARDS.includes(j.card?.type)) return null;
+  const box = h("div", { class: "vo-cards" });
+  try {
+    if (j.replyDraft) renderReplyDraft(j.replyDraft, box);
+    if (j.proposal) renderProposal(j.proposal, box);
+    if (TAP_CARDS.includes(j.card?.type)) renderCardInto(j.card, box);
+  } catch (e) { console.warn("voice card failed", e); }
+  if (!box.childElementCount) return null;
+  voiceTapNodes.set(j, box);
+  return box;
+}
+function voiceResults(j) {
+  const actions = [];
+  if (j.proposal) actions.push(`Helper ready for your OK: ${j.proposal.name}`);
+  if (j.replyDraft) actions.push(`Reply drafted to ${j.replyDraft.to}`);
+  if (j.card?.type === "share") actions.push(`Links ready for ${j.card.agent?.name || "your helper"}`);
+  if (j.card?.type === "relays") actions.push(`${(j.card.items || []).length} update(s) waiting for your approval`);
+  if (j.card?.type === "knowledge_draft") actions.push("Knowledge drafted for your OK");
+  if (j.card?.type === "confirm") actions.push(j.card.title || "Needs your confirmation");
+  return { actions };
+}
 wireVoice({
-  btn: $("#mic-btn"), stateEl: $("#voice-state"), mode: "creator",
-  texts: { connecting: "Getting ready…" },
-  onTranscript: (text, who) => { if (who === "user" || who === "owner") bubble("owner", text); },
-  onReply: (json) => handleCreatorReply(json || {}),
+  btn: $("#mic-btn"), stateEl: $("#voice-state"), mode: "creator", log,
+  texts: { connecting: "Getting ready…", helper: "Crewbrain" },
+  onReply: (json) => { if (json?.agent) upsertHelper(json.agent); },
+  summarize: voiceResults,
+  tapCard: voiceTapCard,
+  onEnd: (summary) => {
+    for (const j of summary.replies || []) {
+      const node = voiceTapNodes.get(j);
+      if (node) { voiceTapNodes.delete(j); log.append(...node.childNodes); if (j.card && !TAP_CARDS.includes(j.card.type)) { try { renderCard(j.card); } catch {} } continue; }
+      if (j.replyDraft) renderReplyDraft(j.replyDraft);
+      if (j.proposal) renderProposal(j.proposal);
+      if (j.card) { try { renderCard(j.card); } catch (e) { console.warn("card failed", e); } }
+    }
+    scrollToEnd(log);
+  },
 });
 
 function upsertHelper(a) {
@@ -138,7 +175,7 @@ function upsertHelper(a) {
 }
 
 /* ---------- reply draft (creator drafts an answer to an inbox item) ---------- */
-function renderReplyDraft(d) {
+function renderReplyDraft(d, target = log) {
   document.querySelectorAll("#reply-draft-text, #reply-send-btn").forEach((x) => x.removeAttribute("id"));
   const ta = h("textarea", { id: "reply-draft-text", rows: 4, "aria-label": `Reply to ${d.to}` }); ta.value = d.text || "";
   const sendB = h("button", { class: "btn yellow", id: "reply-send-btn", type: "button" }, "Send");
@@ -159,14 +196,14 @@ function renderReplyDraft(d) {
       ...(r.data.brainImproved ? [h("div", { class: "muted brain-improved", "data-testid": "brain-improved" }, "Brain improved: future questions like this will find your answer.")] : []));
     refreshInbox();
   });
-  log.append(card); scrollToEnd(log);
+  target.append(card); scrollToEnd(log);
 }
 
 /* ---------- approval card ---------- */
 function acRow(k, v, cls = "") { return h("div", { class: "ac-row " + cls }, h("div", { class: "k" }, k), h("div", { class: "v" }, v)); }
 const list = (arr, fn, none = "Nothing") => (arr && arr.length ? h("ul", {}, arr.map((x) => h("li", {}, fn(x)))) : h("span", { class: "muted" }, none));
 
-function renderProposal(p) {
+function renderProposal(p, target = log) {
   const helper = state.helpers.find((x) => x.id === p.agentId);
   const published = helper && helper.activeRev != null && helper.activeRev >= p.rev;
   const card = h("div", { class: "approval-card" + (published ? " done" : ""), "data-agent": p.agentId, "data-rev": p.rev });
@@ -209,7 +246,7 @@ function renderProposal(p) {
     });
     foot.append(h("p", { class: "ac-note" }, "Nothing goes live until you tap this."), btn);
   }
-  log.append(card);
+  target.append(card);
   scrollToEnd(log);
 }
 /** Job text for the share message; source titles often carry the site ("42 Oak St"). */

@@ -193,6 +193,13 @@ export function renderCard(c) {
   if (c.type === "answer") return answerCard(c);
 }
 
+/** Render a card into `target` (e.g. a sheet inside the voice overlay) instead of the chat log. */
+export function renderCardInto(c, target) {
+  const prev = ctx.log;
+  ctx.log = target;
+  try { return renderCard(c); } finally { ctx.log = prev; }
+}
+
 /* ---------- attach menu ---------- */
 function progress(text) {
   const el = add(h("div", { class: "cb-progress" }, h("div", { class: "spinner" }), h("span", {}, text)));
@@ -242,7 +249,7 @@ async function onVoice() {
   const mr = new MediaRecorder(stream); const chunks = [];
   const time = h("span", { class: "mono" }, "0:00");
   const stopB = h("button", { class: "btn danger small", type: "button" }, "Stop and save");
-  const el = add(card("voice-card", head("question", "Recording a voice note"), h("div", { class: "cb-rec" }, h("span", { class: "rec-dot" }), time, h("span", { class: "cb-muted" }, "up to 1 minute")), stopB));
+  const el = add(card("voicenote-card", head("question", "Recording a voice note"), h("div", { class: "cb-rec" }, h("span", { class: "rec-dot" }), time, h("span", { class: "cb-muted" }, "up to 1 minute")), stopB));
   const t0 = Date.now();
   const tick = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); time.textContent = `0:${String(Math.min(s, 60)).padStart(2, "0")}`; if (s >= 60) stop(); }, 250);
   const stop = () => { if (mr.state !== "inactive") mr.stop(); };

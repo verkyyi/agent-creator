@@ -175,21 +175,49 @@ export async function runVoiceTool(m: Member, agentId: string, name: string, arg
   };
 }
 
-/** Append a voice turn to the chat history so the text UI shows it. */
-export function appendTranscript(m: Member, agentId: string, role: "user" | "helper", text: string) {
+const SESSION_RE = /^[A-Za-z0-9_-]{4,64}$/;
+/** A client-sent voice session id, or a server-made one when it's missing or malformed. */
+export function voiceSessionId(raw: unknown): string {
+  return typeof raw === "string" && SESSION_RE.test(raw) ? raw : `vs_srv_${Math.floor(Date.now() / 60_000).toString(36)}`;
+}
+function validIso(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || raw.length > 40) return undefined;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+/** Append a voice turn to the chat history (audit), marked via:"voice" and grouped by session.
+ *  The chat UI collapses a session's turns into one "Voice conversation" card. */
+export function appendTranscript(m: Member, agentId: string, role: "user" | "helper", text: string, meta: { sessionId?: unknown; startedAt?: unknown } = {}) {
   const { a } = openAgent(m, agentId);
   const key = `${a.id}:${m.id}`;
   const t = text.trim().slice(0, 2000);
   if (!t) return { ok: false };
-  const entry: (typeof db.chatLog)[string][number] = { role, text: t, at: now().toISOString() };
+  const at = now().toISOString();
+  const sessionId = voiceSessionId(meta.sessionId);
+  const log = (db.chatLog[key] ??= []);
+  const first = log.find((x) => x.via === "voice" && x.sessionId === sessionId);
+  const startedAt = first?.startedAt ?? validIso(meta.startedAt) ?? at;
+  const entry: (typeof db.chatLog)[string][number] = { role, text: t, at, via: "voice", sessionId, startedAt };
   if (role === "helper") {
     const turn = lastTurn.get(key);
     if (turn?.citations.length) entry.citations = turn.citations;
     if (turn?.action) entry.action = turn.action;
     lastTurn.delete(key);
   }
-  (db.chatLog[key] ??= []).push(entry);
+  log.push(entry);
   save();
-  return { ok: true };
+  return { ok: true, sessionId };
+}
+
+/** Mark a voice session ended: stamps endedAt on its turns. */
+export function endVoiceSession(m: Member, agentId: string, rawSessionId: unknown) {
+  const { a } = openAgent(m, agentId);
+  if (typeof rawSessionId !== "string" || !SESSION_RE.test(rawSessionId)) return { ok: false };
+  const endedAt = now().toISOString();
+  let n = 0;
+  for (const x of db.chatLog[`${a.id}:${m.id}`] ?? []) if (x.via === "voice" && x.sessionId === rawSessionId) { x.endedAt = endedAt; n++; }
+  if (n) save();
+  return { ok: n > 0, turns: n, endedAt };
 }
 

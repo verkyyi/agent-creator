@@ -1,4 +1,4 @@
-import { api, h, toast, ICON, icon, avatar, avatarKey, svgIcon, downscale, wireVoice, scrollToEnd, typingBubble, citeChip, store } from "./common.js";
+import { api, h, toast, ICON, icon, avatar, avatarKey, svgIcon, downscale, wireVoice, voiceCard, scrollToEnd, typingBubble, citeChip, store } from "./common.js";
 
 const $ = (s) => document.querySelector(s);
 const id = new URLSearchParams(location.search).get("id");
@@ -26,6 +26,12 @@ const STR = {
     photoFail: "Couldn't open that photo. Try taking it again.", herePhoto: "Here's a photo.",
     voiceErr: "Voice isn't available right now. Type your message instead.",
     vs: { connecting: "Getting ready…", listening: "Listening…", thinking: "Thinking…", speaking: "Speaking…" },
+    vo: {
+      title: "Voice", end: "End", mute: "Mute", unmute: "Unmute", captions: "Captions", ended: "Voice ended",
+      conversation: "Voice conversation", turns: (n) => `${n} ${n === 1 ? "turn" : "turns"}`, results: "Results",
+      showTranscript: "Show transcript", hideTranscript: "Hide transcript",
+      autoNote: "Automatic transcript; may differ slightly from what was said.", you: "You", needsTap: "Needs your tap", ttfa: "Time to first audio",
+    },
     crew: ["What's the gate code?", "Where do we park?", "What's today's schedule?"],
     home: ["Will my fridge stay on in a blackout?", "When is the inspection?", "Can we add a second battery later?"],
     lang: "Español", company: "your contractor",
@@ -49,6 +55,12 @@ const STR = {
     photoFail: "No se pudo abrir la foto. Tómala otra vez.", herePhoto: "Aquí va una foto.",
     voiceErr: "La voz no está disponible ahora. Escribe tu mensaje.",
     vs: { connecting: "Preparando…", listening: "Escuchando…", thinking: "Pensando…", speaking: "Hablando…" },
+    vo: {
+      title: "Voz", end: "Terminar", mute: "Silenciar", unmute: "Activar micrófono", captions: "Subtítulos", ended: "Llamada de voz terminada",
+      conversation: "Conversación de voz", turns: (n) => `${n} ${n === 1 ? "turno" : "turnos"}`, results: "Resultados",
+      showTranscript: "Ver transcripción", hideTranscript: "Ocultar transcripción",
+      autoNote: "Transcripción automática; puede diferir un poco de lo que se dijo.", you: "Tú", needsTap: "Necesita tu toque", ttfa: "Tiempo hasta el primer audio",
+    },
     crew: ["¿Cuál es el código del portón?", "¿Dónde nos estacionamos?", "¿Cuál es el horario de hoy?"],
     home: ["¿Mi refrigerador seguirá funcionando en un apagón?", "¿Cuándo es la inspección?", "¿Podemos añadir otra batería después?"],
     lang: "English", company: "tu contratista",
@@ -172,12 +184,46 @@ function helperMessage(m) {
       h("blockquote", {}, `“${m.action.summary || ""}”`),
       h("div", { class: "oa-saved" }, t().savedTo(info?.tenantName || t().company))));
   } else if (m.action) {
-    const owner = info?.ownerName || "the owner";
-    const k = m.action.kind;
-    const label = k === "walkthrough_requested" ? t().walk(owner) : k === "relay_requested" ? t().relayAsk(firstName(owner) || owner) : k === "relay_sent" ? t().relaySent : t().logged(owner);
-    chat.append(h("div", { class: "action-chip", "data-kind": m.action.kind }, icon("check"), h("span", {}, label + (m.action.summary || ""))));
+    chat.append(h("div", { class: "action-chip", "data-kind": m.action.kind }, icon("check"), h("span", {}, actionText(m.action))));
   }
   scrollToEnd(chat);
+}
+function actionText(a) {
+  const owner = info?.ownerName || "the owner";
+  const k = a.kind;
+  if (k === "owner_answer") return t().answered(firstName(owner) || owner) + " " + (a.summary || "");
+  const label = k === "walkthrough_requested" ? t().walk(owner) : k === "relay_requested" ? t().relayAsk(firstName(owner) || owner) : k === "relay_sent" ? t().relaySent : t().logged(owner);
+  return label + (a.summary || "");
+}
+
+/* ---------- voice: one card per session, never loose bubbles ---------- */
+const voiceTexts = () => ({ ...t().vs, ...t().vo, helper: firstName(info?.name) || t().vo.title, source: t().source, loading: t().loading });
+const cardOpts = () => ({ texts: voiceTexts, agentId: id, actionLabel: actionText });
+/** Render chat messages, collapsing each run of via:"voice" turns (same session) into one voice card. */
+function renderMessages(msgs) {
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m.via !== "voice") { if (m.role === "user") userBubble(m.text, m.imageDataUrl); else helperMessage(m); continue; }
+    const group = [m];
+    while (i + 1 < msgs.length && msgs[i + 1].via === "voice" && (msgs[i + 1].sessionId || "") === (m.sessionId || "")) group.push(msgs[++i]);
+    chat.append(voiceCard(voiceSummary(group), cardOpts()));
+  }
+  scrollToEnd(chat);
+}
+function voiceSummary(group) {
+  const seen = new Set(), citations = [], actions = [];
+  for (const g of group) {
+    for (const c of g.citations || []) { const k = `${c.title}|${c.section || ""}`; if (!seen.has(k)) { seen.add(k); citations.push(c); } }
+    if (g.action) actions.push(g.action);
+  }
+  const ts = (x) => (x ? Date.parse(x) || 0 : 0);
+  const last = group[group.length - 1];
+  return {
+    sessionId: group[0].sessionId, citations, actions,
+    startedAt: ts(group[0].startedAt) || ts(group[0].at),
+    endedAt: ts(last.endedAt) || ts(last.at),
+    turns: group.map((g) => ({ who: g.role === "user" ? "user" : "assistant", text: g.text })),
+  };
 }
 
 /* ---------- welcome + starters ---------- */
@@ -229,10 +275,7 @@ async function loadHistory() {
   intro();
   const msgs = (r.ok && r.data.messages) || [];
   rendered = msgs.length;
-  for (const m of msgs) {
-    if (m.role === "user") userBubble(m.text, m.imageDataUrl);
-    else helperMessage(m);
-  }
+  renderMessages(msgs);
   startersShown = !msgs.some((m) => m.role === "user");
   renderStarters();
   scrollToEnd(chat);
@@ -250,9 +293,8 @@ async function pollHistory() {
   if (!r.ok || sending) return;
   const msgs = r.data.messages || [];
   if (msgs.length <= rendered) { rendered = Math.min(rendered, msgs.length); return; }
-  for (const m of msgs.slice(rendered)) {
-    if (m.role === "user") userBubble(m.text, m.imageDataUrl); else helperMessage(m);
-  }
+  // Voice turns from this device are summed up by the live voice card when the session ends.
+  renderMessages(msgs.slice(rendered).filter((m) => m.via !== "voice"));
   rendered = msgs.length;
 }
 
@@ -372,10 +414,11 @@ async function boot() {
   await loadHistory();
   if (ended) return;
   voice = wireVoice({
-    btn: $("#mic-btn"), stateEl: $("#voice-state"), mode: "agent", agentId: id,
-    texts: t().vs, voiceErr: t().voiceErr,
-    onTranscript: (text, who) => { if (who === "user") userBubble(text); },
-    onReply: (j) => { rendered += 2; handleReply(j); },
+    btn: $("#mic-btn"), stateEl: $("#voice-state"), mode: "agent", agentId: id, log: chat,
+    texts: voiceTexts, voiceErr: t().voiceErr, actionLabel: actionText,
+    // During voice nothing but an "ended" reply touches the chat; the rest lands in the voice card.
+    onReply: (j) => { if (j && (j.error === "ended" || j.ended)) handleReply(j); },
+    onEnd: () => hideStarters(),
   });
   if (!store.get(`cb.welcomed.${id}`)) showWelcome();
   poll = setInterval(() => { if (!ended) { loadPublic(false); pollHistory(); } }, 5000);

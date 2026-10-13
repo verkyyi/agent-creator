@@ -178,13 +178,33 @@ test("/tool gating: excerpts for the audience, 403 for others, ended after close
 
   // Transcripts show in history, helper turn carries citations from the last search.
   await call(marco, "api/voice/tool", { agentId: rex, name: "search_brain", args: { query: "gate code" } });
-  assert.equal((await call(marco, "api/voice/transcript", { agentId: rex, role: "user", text: "What's the gate code?" })).status, 200);
-  assert.equal((await call(marco, "api/voice/transcript", { agentId: rex, role: "helper", text: "Four four one seven, then the pound key." })).status, 200);
+  const sid = "vs_test_session_1";
+  const started = "2026-10-13T10:00:00.000Z";
+  const t1 = await call(marco, "api/voice/transcript", { agentId: rex, role: "user", text: "What's the gate code?", sessionId: sid, startedAt: started });
+  assert.equal(t1.status, 200);
+  assert.equal(t1.json.sessionId, sid);
+  assert.equal((await call(marco, "api/voice/transcript", { agentId: rex, role: "helper", text: "Four four one seven, then the pound key.", sessionId: sid })).status, 200);
   const hist = await app.request(`${BASE}/api/agents/${rex}/history`, { headers: { cookie: marco.cookie } });
   const msgs = (await hist.json()).messages;
   assert.equal(msgs.at(-2).role, "user");
   assert.equal(msgs.at(-1).role, "helper");
   assert.ok(msgs.at(-1).citations?.length);
+  // Voice turns are kept for audit, marked via:"voice" and grouped under one session.
+  for (const x of msgs.slice(-2)) {
+    assert.equal(x.via, "voice");
+    assert.equal(x.sessionId, sid);
+    assert.equal(x.startedAt, started);
+  }
+  const ended = await call(marco, "api/voice/end", { agentId: rex, sessionId: sid });
+  assert.equal(ended.status, 200);
+  assert.equal(ended.json.turns, 2);
+  const hist2 = (await (await app.request(`${BASE}/api/agents/${rex}/history`, { headers: { cookie: marco.cookie } })).json()).messages;
+  assert.ok(hist2.slice(-2).every((x: any) => x.endedAt && x.sessionId === sid));
+  // A malformed session id still gets grouped under a server-made id, never stored verbatim.
+  const bad = await call(marco, "api/voice/transcript", { agentId: rex, role: "user", text: "hello", sessionId: "<script>" });
+  assert.equal(bad.status, 200);
+  assert.match(bad.json.sessionId, /^vs_srv_/);
+  assert.equal((await call(anita, "api/voice/end", { agentId: rex, sessionId: sid })).status, 403);
 
   // Household member, not in Rex's audience.
   const denied = await call(anita, "api/voice/tool", { agentId: rex, name: "search_brain", args: { query: "gate code" } });

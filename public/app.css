@@ -593,3 +593,60 @@ textarea.cb-input { resize: vertical; min-height: 110px; }
 .avatar.av-house[data-avatar] { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, var(--paper, #fff)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ok) 45%, transparent); }
 .avatar.av-hardhat[data-avatar] { color: var(--tag-ink); background: var(--tag); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tag-ink) 18%, transparent); }
 .chev svg, .id-btn .go svg { width: 20px; height: 20px; display: block; }
+
+/* ---------- full-screen voice overlay ---------- */
+body.voice-open { overflow: hidden; }
+.voice-overlay { position: fixed; inset: 0; z-index: 80; background: #05070a; color: #e9edf2; display: grid; grid-template-rows: auto 1fr auto; padding: calc(12px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); animation: fade .15s ease-out; font-family: var(--f-body); }
+.vo-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.vo-captions-btn { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid #34404f; background: transparent; color: #c3cfdc; font: inherit; font-size: .9rem; cursor: pointer; }
+.vo-captions-btn[aria-pressed="true"] { background: #e9edf2; color: #05070a; border-color: #e9edf2; }
+.vo-ttfa { font-family: var(--f-mono); font-size: .8rem; color: #9fb0c4; }
+.vo-center { display: grid; justify-items: center; align-content: center; gap: 22px; text-align: center; min-height: 0; }
+.vo-orb { --lvl: 0; width: min(56vw, 34vh, 240px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; transform: scale(calc(1 + var(--lvl) * .35)); transition: transform .08s linear; }
+.vo-orb-core { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6c2 0%, #f5c400 38%, #b88a00 75%, #5a4300 100%); box-shadow: 0 0 calc(30px + var(--lvl) * 80px) rgba(245, 196, 0, calc(.25 + var(--lvl) * .5)); transition: background .3s, box-shadow .1s; }
+.voice-overlay[data-state="connecting"] .vo-orb-core { background: radial-gradient(circle at 35% 30%, #e9edf2 0%, #6b7a8c 60%, #2a323d 100%); animation: vo-breathe 1.6s ease-in-out infinite; }
+.voice-overlay[data-state="thinking"] .vo-orb-core { background: radial-gradient(circle at 35% 30%, #dbe6f7 0%, #6ea2f2 45%, #1d5fc4 100%); animation: vo-breathe 1.1s ease-in-out infinite; box-shadow: 0 0 40px rgba(110, 162, 242, .4); }
+.voice-overlay.muted .vo-orb-core { filter: grayscale(.85) brightness(.7); }
+@keyframes vo-breathe { 0%, 100% { transform: scale(.94); } 50% { transform: scale(1); } }
+.vo-state { font-family: var(--f-mono); font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #f5c400; min-height: 1.4em; }
+.vo-caption { margin: 0; max-width: 34ch; font-size: 1.25rem; line-height: 1.4; color: #e9edf2; min-height: 2.8em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.vo-bottom { display: flex; justify-content: center; gap: 28px; }
+.vo-btn { display: grid; justify-items: center; gap: 6px; background: none; border: 0; color: #e9edf2; font: inherit; font-size: .9rem; cursor: pointer; padding: 0; min-width: 72px; }
+.vo-btn .vo-ico { width: 68px; height: 68px; min-width: 56px; min-height: 56px; border-radius: 50%; display: grid; place-items: center; background: #1e2530; border: 1px solid #34404f; }
+.vo-btn .vo-ico svg { width: 28px; height: 28px; }
+.vo-mute.on .vo-ico { background: #e9edf2; color: #05070a; }
+.vo-mute.on .vo-ico svg { opacity: .55; }
+.vo-end .vo-ico { background: #d93025; border-color: #d93025; color: #fff; }
+.vo-btn:focus-visible .vo-ico, .vo-captions-btn:focus-visible { outline: 3px solid #f5c400; outline-offset: 3px; }
+.vo-sheet-slot { position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 8px; max-height: 78%; }
+.vo-sheet-slot:empty { display: none; }
+.vo-sheet { background: var(--sheet); color: var(--ink); border-radius: 16px 16px 0 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; max-height: 78vh; box-shadow: 0 -20px 50px -10px rgba(0, 0, 0, .6); animation: pop .2s ease-out; }
+.vo-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.vo-sheet-head .sheet-close { color: var(--ink); }
+@media (min-width: 700px) { .vo-sheet-slot { left: 50%; right: auto; width: 560px; transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .voice-overlay, .vo-sheet { animation: none; }
+  .vo-orb { transform: none !important; transition: none; }
+  .voice-overlay .vo-orb-core { animation: none !important; }
+}
+
+/* ---------- the one card a voice session leaves in the chat ---------- */
+.voice-card { align-self: stretch; border: 1px solid #34404f; background: rgba(255, 255, 255, .03); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; animation: pop .2s ease-out; }
+.vc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vc-head .ico-i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--tag); color: var(--tag-ink); }
+.vc-head .ico-i svg { width: 16px; height: 16px; }
+.vc-meta { font-family: var(--f-mono); font-size: .8rem; opacity: .75; }
+.vc-label { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.vc-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vc-action { display: flex; align-items: flex-start; gap: 8px; font-size: .92rem; }
+.vc-action .ico-i { flex: none; width: 20px; height: 20px; border-radius: 50%; background: #6fd39c; color: #05200f; display: grid; place-items: center; }
+.vc-action .ico-i svg { width: 14px; height: 14px; }
+.vc-toggle { justify-self: start; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; background: none; border: 0; color: inherit; font: inherit; font-size: .9rem; text-decoration: underline; cursor: pointer; padding: 0; }
+.vc-toggle .chev svg { width: 16px; height: 16px; transition: transform .15s; }
+.vc-toggle[aria-expanded="true"] .chev svg { transform: rotate(90deg); }
+.vc-transcript { display: grid; gap: 6px; border-top: 1px solid #34404f; padding-top: 8px; }
+.vc-transcript[hidden] { display: none; }
+.vc-note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: .8rem; opacity: .7; }
+.vc-note .ico-i svg { width: 14px; height: 14px; }
+.vc-line { margin: 0; font-size: .92rem; line-height: 1.4; }
+.vc-line b { font-weight: 700; opacity: .8; }

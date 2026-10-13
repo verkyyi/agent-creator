@@ -263,12 +263,184 @@ export function shareSheet(links, { title = "Share links", helperName = "", ends
 
 /* ---------- voice ---------- */
 const STATE_TEXT = { connecting: "Connecting…", listening: "Listening…", thinking: "Thinking…", speaking: "Speaking…" };
-/** Wires a mic button to voice.js (loaded lazily). Text input keeps working without it. */
-export function wireVoice({ btn, stateEl, mode, agentId, onTranscript, onReply, texts = {}, voiceErr }) {
-  let session = null, ttfa = "";
-  const T = { ...STATE_TEXT, ...texts };
+/** Overlay + voice-card strings. Callers override any of them (a.html passes Spanish). */
+export const VOICE_TEXT = {
+  ...STATE_TEXT,
+  title: "Voice", end: "End", mute: "Mute", unmute: "Unmute", captions: "Captions",
+  ended: "Voice ended", conversation: "Voice conversation", turns: (n) => `${n} ${n === 1 ? "turn" : "turns"}`,
+  results: "Results", showTranscript: "Show transcript", hideTranscript: "Hide transcript",
+  autoNote: "Automatic transcript; may differ slightly from what was said.",
+  you: "You", helper: "Helper", source: "Source", loading: "Loading…", needsTap: "Needs your tap", ttfa: "Time to first audio",
+};
+const textsOf = (texts) => ({ ...VOICE_TEXT, ...(typeof texts === "function" ? texts() : texts || {}) });
+const reducedMotion = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
+const CAPTIONS_KEY = "cb.voice.captions";
+export const fmtDuration = (ms) => { const s = Math.max(0, Math.round((ms || 0) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+
+/** Full-screen voice view (ChatGPT-style): orb, state line, one live caption, Mute + End.
+ *  `onEnd` must stop the session; Esc and the End button both call it. */
+export function openVoiceOverlay({ texts, onEnd, onMute } = {}) {
+  const T = textsOf(texts);
+  const prevFocus = document.activeElement;
+  let captionsOn = store.get(CAPTIONS_KEY) !== "0";
+  let muted = false, closed = false, raf = 0, actx = null;
+  const analysers = [];
+
+  const orb = h("div", { class: "vo-orb", "aria-hidden": "true" }, h("div", { class: "vo-orb-core" }));
+  const stateLine = h("div", { class: "vo-state", "aria-live": "polite", role: "status" }, T.connecting);
+  const ttfaEl = h("div", { class: "vo-ttfa mono", title: T.ttfa, hidden: true });
+  const caption = h("p", { class: "vo-caption", "aria-live": "off", hidden: !captionsOn });
+  const capBtn = h("button", { class: "vo-captions-btn", type: "button", "aria-pressed": String(captionsOn) }, T.captions);
+  const muteBtn = h("button", { class: "vo-btn vo-mute", id: "voice-mute-btn", type: "button", "aria-pressed": "false", "aria-label": T.mute },
+    h("span", { class: "vo-ico", "aria-hidden": "true", html: ICON.mic }), h("span", { class: "vo-lbl" }, T.mute));
+  const endBtn = h("button", { class: "vo-btn vo-end", id: "voice-end-btn", type: "button", "aria-label": T.end },
+    h("span", { class: "vo-ico", "aria-hidden": "true", html: ICON.x }), h("span", { class: "vo-lbl" }, T.end));
+  const sheetSlot = h("div", { class: "vo-sheet-slot" });
+  const el = h("div", { class: "voice-overlay", id: "voice-overlay", role: "dialog", "aria-modal": "true", "aria-label": T.title, "data-state": "connecting" },
+    h("div", { class: "vo-top" }, capBtn, ttfaEl),
+    h("div", { class: "vo-center" }, orb, stateLine, caption),
+    h("div", { class: "vo-bottom" }, muteBtn, endBtn),
+    sheetSlot);
+
+  capBtn.addEventListener("click", () => {
+    captionsOn = !captionsOn; store.set(CAPTIONS_KEY, captionsOn ? "1" : "0");
+    capBtn.setAttribute("aria-pressed", String(captionsOn)); caption.hidden = !captionsOn;
+  });
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    muteBtn.setAttribute("aria-pressed", String(muted));
+    muteBtn.setAttribute("aria-label", muted ? T.unmute : T.mute);
+    muteBtn.querySelector(".vo-lbl").textContent = muted ? T.unmute : T.mute;
+    muteBtn.classList.toggle("on", muted);
+    el.classList.toggle("muted", muted);
+    try { onMute?.(muted); } catch {}
+  });
+  endBtn.addEventListener("click", () => { try { onEnd?.(); } catch {} close(); });
+
+  const focusables = () => [...el.querySelectorAll("button, [href], textarea, input, select, [tabindex]:not([tabindex='-1'])")].filter((x) => !x.disabled && x.offsetParent !== null);
+  const onKey = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (sheetSlot.firstChild) { sheetSlot.replaceChildren(); endBtn.focus(); return; } endBtn.click(); return; }
+    if (e.key !== "Tab") return;
+    const f = focusables(); if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+  };
+  document.addEventListener("keydown", onKey, true);
+  document.body.append(el);
+  document.body.classList.add("voice-open");
+  endBtn.focus();
+
+  // Orb level from Web Audio (remote voice + mic). Reduced motion: no pulsing, state color only.
+  const level = () => {
+    let max = 0;
+    for (const { an, buf } of analysers) {
+      an.getByteTimeDomainData(buf);
+      let sum = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
+      max = Math.max(max, Math.sqrt(sum / buf.length));
+    }
+    return Math.min(1, max * 4);
+  };
+  let smooth = 0;
+  const tick = () => {
+    if (closed) return;
+    smooth = smooth * 0.75 + level() * 0.25;
+    orb.style.setProperty("--lvl", smooth.toFixed(3));
+    raf = requestAnimationFrame(tick);
+  };
+  function attach(stream) {
+    if (!stream || closed || reducedMotion()) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      actx ||= new AC();
+      if (actx.state === "suspended") actx.resume().catch(() => {});
+      const src = actx.createMediaStreamSource(stream);
+      const an = actx.createAnalyser(); an.fftSize = 512;
+      src.connect(an); // analyser only: not connected to the speakers (the <audio> element plays it)
+      analysers.push({ an, buf: new Uint8Array(an.fftSize), src });
+      if (!raf) raf = requestAnimationFrame(tick);
+    } catch {}
+  }
+  function close() {
+    if (closed) return;
+    closed = true;
+    cancelAnimationFrame(raf);
+    for (const a of analysers) { try { a.src.disconnect(); } catch {} }
+    try { actx?.close(); } catch {}
+    document.removeEventListener("keydown", onKey, true);
+    el.remove();
+    document.body.classList.remove("voice-open");
+    try { prevFocus?.focus?.(); } catch {}
+  }
+  return {
+    el,
+    get closed() { return closed; },
+    get muted() { return muted; },
+    setState(s) {
+      if (closed) return;
+      el.dataset.state = s;
+      const text = T[s] || "";
+      if (text && stateLine.textContent !== text) stateLine.textContent = text;
+      if (s === "thinking" || (s === "listening" && el.dataset.spoke === "1")) { caption.textContent = ""; el.dataset.spoke = ""; }
+    },
+    setTtfa(ms) { if (closed) return; ttfaEl.hidden = false; ttfaEl.textContent = (ms / 1000).toFixed(1) + " s"; },
+    caption(text) { if (closed) return; caption.textContent = text || ""; el.dataset.spoke = "1"; },
+    attach,
+    /** A card that needs a tap (approval, reply draft, confirm) as a bottom sheet inside the overlay. */
+    showSheet(node, title) {
+      if (closed || !node) return;
+      const panel = h("div", { class: "vo-sheet", role: "dialog", "aria-label": title || T.needsTap },
+        h("div", { class: "vo-sheet-head" }, h("b", {}, title || T.needsTap),
+          h("button", { class: "sheet-close", type: "button", "aria-label": "Close", html: ICON.x, onclick: () => { panel.remove(); endBtn.focus(); } })),
+        node);
+      sheetSlot.append(panel);
+      (panel.querySelector("button.yellow, textarea, button") || panel).focus?.();
+    },
+    close,
+  };
+}
+
+/** The one card a finished voice session leaves in the chat. summary: { startedAt, endedAt, turns:[{who,text}], citations, actions:[label] }. */
+export function voiceCard(summary, { texts, agentId, actionLabel } = {}) {
+  const T = textsOf(texts);
+  const lines = summary.turns || [];
+  const n = lines.filter((x) => x.who === "user").length || lines.length;
+  const dur = fmtDuration((summary.endedAt || 0) - (summary.startedAt || 0));
+  const results = [];
+  for (const c of summary.citations || []) results.push(h("li", { class: "vc-cite" }, citeChip(c, agentId, { prefix: T.source, loading: T.loading })));
+  for (const a of summary.actions || []) {
+    const label = typeof a === "string" ? a : (actionLabel ? actionLabel(a) : `${a.kind}: ${a.summary || ""}`);
+    if (label) results.push(h("li", { class: "vc-action", "data-kind": a.kind || "" }, icon("check"), h("span", {}, label)));
+  }
+  const tr = h("div", { class: "vc-transcript", hidden: true },
+    h("p", { class: "vc-note" }, icon("info"), h("span", {}, T.autoNote)),
+    lines.map((x) => h("p", { class: "vc-line " + (x.who === "user" ? "u" : "a") }, h("b", {}, x.who === "user" ? T.you : T.helper), " ", x.text)));
+  const toggle = h("button", { class: "vc-toggle", type: "button", "aria-expanded": "false" }, h("span", {}, T.showTranscript), h("span", { class: "chev", "aria-hidden": "true", html: ICON.chevron }));
+  toggle.addEventListener("click", () => {
+    const open = tr.hidden; tr.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.firstChild.textContent = open ? T.hideTranscript : T.showTranscript;
+  });
+  return h("div", { class: "voice-card", "data-testid": "voice-card", "data-session": summary.sessionId || "" },
+    h("div", { class: "vc-head" }, icon("mic"), h("b", {}, T.conversation), h("span", { class: "vc-meta mono" }, `${dur} · ${T.turns(n)}`)),
+    results.length ? [h("div", { class: "vc-label" }, T.results), h("ul", { class: "vc-results" }, results)] : null,
+    lines.length ? [toggle, tr] : null);
+}
+
+/** Wires a mic button to voice.js (loaded lazily). Text input keeps working without it.
+ *  Voice runs in a full-screen overlay; no transcript bubbles go to the chat while it's live.
+ *  When it ends, ONE voice card goes into `log` (or a "Voice ended" toast if nobody spoke),
+ *  then onEnd(summary) lets the page add the cards that arrived (proposals, drafts, shares).
+ *  - onReply(json): every reply, for page bookkeeping (e.g. "ended"); must not render bubbles.
+ *  - summarize(json) -> { citations?, actions? } for the voice card's Results.
+ *  - tapCard(json) -> Element|null: a card that needs a tap, shown as a sheet inside the overlay. */
+export function wireVoice({ btn, stateEl, mode, agentId, log, onReply, onEnd, summarize, tapCard, actionLabel, texts = {}, voiceErr }) {
+  let session = null, ttfa = "", overlay = null, run = null;
+  const T = () => textsOf(texts);
   const setState = (s) => {
-    const text = T[s] || (s && s !== "idle" && s !== "stopped" && s !== "closed" ? String(s) : "");
+    overlay?.setState(s);
+    if (!stateEl) return;
+    const text = T()[s] || (s && s !== "idle" && s !== "stopped" && s !== "closed" ? String(s) : "");
     if (!text) { stateEl.hidden = true; stateEl.innerHTML = ""; ttfa = ""; return; }
     stateEl.hidden = false;
     stateEl.innerHTML = '<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>';
@@ -279,8 +451,16 @@ export function wireVoice({ btn, stateEl, mode, agentId, onTranscript, onReply, 
     const ms = m && (m.ttfaMs ?? m.ttfa ?? m.firstAudioMs);
     if (typeof ms !== "number" || !isFinite(ms)) return;
     ttfa = (ms / 1000).toFixed(1) + " s";
-    const old = stateEl.querySelector(".ttfa");
-    if (old) old.textContent = ttfa; else if (!stateEl.hidden) stateEl.append(h("span", { class: "ttfa mono", title: "Time to first audio" }, ttfa));
+    overlay?.setTtfa(ms);
+  };
+  const finish = (r) => {
+    if (!r || r.done) return;
+    r.done = true;
+    const summary = { sessionId: r.sessionId, startedAt: r.startedAt, endedAt: Date.now(), turns: r.turns, citations: r.citations, actions: r.actions, replies: r.replies };
+    const spoke = r.turns.some((x) => x.who === "user");
+    if (!spoke && !r.replies.some((j) => j && (j.proposal || j.replyDraft || j.card))) { toast(T().ended); }
+    else if (log) { log.append(voiceCard(summary, { texts, agentId, actionLabel })); scrollToEnd(log); }
+    try { onEnd?.(summary); } catch (e) { console.warn("voice onEnd failed", e); }
   };
   // `starting` covers the seconds between the tap and startVoice() resolving (mic prompt,
   // WebRTC handshake). A tap then must cancel that attempt, not start a second session.
@@ -290,34 +470,62 @@ export function wireVoice({ btn, stateEl, mode, agentId, onTranscript, onReply, 
     const c = starting; starting = null;
     try { c?.abort(); } catch {}
     try { s?.stop(); } catch {}
+    const ov = overlay; overlay = null;
+    try { ov?.close(); } catch {}
+    const r = run; run = null;
+    if (r) { r.mic?.getTracks().forEach((t) => { try { t.stop(); } catch {} }); finish(r); }
     btn.classList.remove("live"); btn.innerHTML = ICON.mic; btn.setAttribute("aria-label", "Talk"); btn.setAttribute("aria-pressed", "false"); setState("");
   };
   btn.innerHTML = ICON.mic;
   btn.addEventListener("click", async () => {
-    if (session || starting) return stop();
+    if (session || starting || overlay) return stop();
     btn.classList.add("live"); btn.innerHTML = ICON.stop; btn.setAttribute("aria-label", "Stop talking"); btn.setAttribute("aria-pressed", "true");
+    const r = run = { startedAt: Date.now(), turns: [], citations: [], actions: [], replies: [], mic: null, muted: false, done: false, sessionId: "" };
+    overlay = openVoiceOverlay({
+      texts, onEnd: stop,
+      onMute: (m) => { r.muted = m; r.mic?.getAudioTracks().forEach((t) => (t.enabled = !m)); },
+    });
     setState("connecting");
     let mod;
     try { mod = await import("./voice.js"); }
     catch { stop(); toast(voiceErr || "Voice isn't available right now. Type your message instead.", "err"); return; }
+    if (run !== r) return; // ended while voice.js was loading
     const ctrl = new AbortController();
     starting = ctrl;
+    const live = () => !ctrl.signal.aborted && run === r;
+    const seenCite = new Set();
     try {
       const sess = await mod.startVoice({
         mode, agentId, signal: ctrl.signal,
-        onState: (s) => { if (ctrl.signal.aborted) return; setState(s); if (s === "stopped" || s === "closed") stop(); },
-        onTranscript: (text, who) => onTranscript?.(text, who),
-        onReply: (json) => onReply?.(json),
+        onState: (s) => { if (!live()) return; setState(s); if (s === "stopped" || s === "closed") stop(); },
+        onTranscript: (text, who) => { if (run === r && text) r.turns.push({ who: who === "user" || who === "owner" ? "user" : "assistant", text }); },
+        onCaption: (text) => { if (live()) overlay?.caption(text); },
+        onMic: (stream) => { r.mic = stream; if (r.muted) stream.getAudioTracks().forEach((t) => (t.enabled = false)); overlay?.attach(stream); },
+        onRemote: (stream) => overlay?.attach(stream),
+        onReply: (json) => {
+          if (run !== r || !json) { try { onReply?.(json); } catch {} return; }
+          r.replies.push(json);
+          const add = (summarize ? summarize(json) : null) || {};
+          for (const c of [...(json.citations || []), ...(add.citations || [])]) {
+            const k = `${c.title}|${c.section || ""}`; if (!seenCite.has(k)) { seenCite.add(k); r.citations.push(c); }
+          }
+          if (json.action) r.actions.push(json.action);
+          for (const a of add.actions || []) r.actions.push(a);
+          const node = tapCard?.(json);
+          if (node) overlay?.showSheet(node);
+          try { onReply?.(json); } catch {}
+        },
         onMetrics,
-        onError: (msg) => { if (ctrl.signal.aborted) return; stop(); toast(msg || "Voice stopped. You can type instead.", "err"); },
+        onError: (msg) => { if (!live()) return; stop(); toast(msg || "Voice stopped. You can type instead.", "err"); },
       });
-      if (ctrl.signal.aborted) { try { sess?.stop(); } catch {} return; } // cancelled while connecting
+      if (!live()) { try { sess?.stop(); } catch {} return; } // cancelled while connecting
       starting = null;
       session = sess;
+      r.sessionId = sess?.sessionId || "";
       if (!session) stop();
-    } catch (e) { if (ctrl.signal.aborted) return; stop(); toast((e && e.message) || voiceErr || "Couldn't start voice. Type your message instead.", "err"); }
+    } catch (e) { if (!live()) return; stop(); toast((e && e.message) || voiceErr || "Couldn't start voice. Type your message instead.", "err"); }
   });
-  return { stop, start: () => { if (!session) btn.click(); } };
+  return { stop, start: () => { if (!session && !starting && !overlay) btn.click(); }, get active() { return !!(session || starting || overlay); } };
 }
 
 export function scrollToEnd(el) { requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })); }

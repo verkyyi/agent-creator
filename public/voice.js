@@ -44,7 +44,12 @@ async function postJson(url, body) {
   return { res, json };
 }
 
-export async function startVoice({ mode, agentId, persona, onState, onTranscript, onReply, onError, onMetrics, signal } = {}) {
+function newSessionId() {
+  try { if (crypto.randomUUID) return "vs_" + crypto.randomUUID().replace(/-/g, "").slice(0, 20); } catch (_) {}
+  return "vs_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+export async function startVoice({ mode, agentId, persona, onState, onTranscript, onReply, onError, onMetrics, onCaption, onMic, onRemote, signal } = {}) {
   const state = (s) => { try { onState && onState(s); } catch (_) {} };
   const fail = (err) => { try { onError && onError(friendly(err), err); } catch (_) {} };
   const emit = (fn, ...a) => { try { fn && fn(...a); } catch (_) {} };
@@ -56,6 +61,11 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
   let audioEl = null;
   let stopped = false;
   const handledCalls = new Set();
+  // One id per voice session: the server groups this session's turns under it.
+  const sessionId = newSessionId();
+  const startedAt = new Date().toISOString();
+  let logged = 0;
+  let captionText = "";
 
   // Response bookkeeping: never send response.create while one is active.
   let responseActive = false;
@@ -88,11 +98,20 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
     if (audioEl) {
       try { audioEl.srcObject = null; audioEl.remove(); } catch (_) {}
     }
+    if (isAgent && logged) {
+      try {
+        fetch("api/voice/end", {
+          method: "POST", credentials: "same-origin", keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agentId, sessionId }),
+        }).catch(() => {});
+      } catch (_) {}
+    }
     state("stopped");
   }
   // The caller can cancel while we're still connecting (mic prompt, SDP exchange).
   if (signal) {
-    if (signal.aborted) { stopped = true; return { stop }; }
+    if (signal.aborted) { stopped = true; return { stop, sessionId }; }
     signal.addEventListener("abort", stop, { once: true });
   }
 
@@ -179,7 +198,8 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
 
   function logTranscript(role, text) {
     if (!isAgent || !text) return;
-    postJson("api/voice/transcript", { agentId, role, text }).catch(() => {});
+    logged += 1;
+    postJson("api/voice/transcript", { agentId, role, text, sessionId, startedAt }).catch(() => {});
   }
 
   try {
@@ -196,7 +216,7 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
     try { sess = await r.json(); } catch (_) { sess = {}; }
     if (r.status === 503) throw codedError("voice_unavailable");
     if (r.status === 401) throw codedError("auth");
-    if (r.status === 410) { emit(onReply, sess); stop(); return { stop }; }
+    if (r.status === 410) { emit(onReply, sess); stop(); return { stop, sessionId }; }
     if (r.status === 403 || r.status === 404) throw codedError("forbidden");
     if (!r.ok || !sess.clientSecret) throw codedError("session_failed");
     const relayPath = sess.relayPath;
@@ -207,7 +227,8 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
     // Cancelled while the mic prompt was open: stop() already ran, so release the mic here.
-    if (stopped) { mic.getTracks().forEach((t) => t.stop()); mic = null; return { stop }; }
+    if (stopped) { mic.getTracks().forEach((t) => t.stop()); mic = null; return { stop, sessionId }; }
+    emit(onMic, mic);
 
     // 3. Peer connection + remote audio (hidden <audio autoplay playsinline> for iOS Safari).
     pc = new RTCPeerConnection();
@@ -219,6 +240,7 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
     pc.ontrack = (e) => {
       lastRemoteStream = e.streams[0] || new MediaStream([e.track]);
       audioEl.srcObject = lastRemoteStream;
+      emit(onRemote, lastRemoteStream);
       const p = audioEl.play && audioEl.play();
       if (p && p.catch) p.catch(() => {});
     };
@@ -271,11 +293,15 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
           break;
         case "response.created":
           responseActive = true;
+          captionText = "";
           break;
         case "response.output_audio.delta":
+          markFirstAudio();
+          break;
         case "response.output_audio_transcript.delta":
         case "response.audio_transcript.delta": // pre-GA name
           markFirstAudio();
+          if (typeof evt.delta === "string") { captionText += evt.delta; emit(onCaption, captionText, false); }
           break;
         case "response.function_call_arguments.done":
           if (evt.call_id && !handledCalls.has(evt.call_id)) {
@@ -288,7 +314,10 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
           break;
         case "response.output_audio_transcript.done":
         case "response.audio_transcript.done": // pre-GA name
-          if (evt.transcript && evt.transcript.trim()) emit(onTranscript, evt.transcript.trim(), "assistant");
+          if (evt.transcript && evt.transcript.trim()) {
+            emit(onCaption, evt.transcript.trim(), true);
+            emit(onTranscript, evt.transcript.trim(), "assistant");
+          }
           break;
         case "response.done": {
           responseActive = false;
@@ -349,12 +378,12 @@ export async function startVoice({ mode, agentId, persona, onState, onTranscript
     });
     if (!sdpRes.ok) throw codedError("network");
     const answerSdp = await sdpRes.text();
-    if (stopped) { try { pc.close(); } catch (_) {} return { stop }; }
+    if (stopped) { try { pc.close(); } catch (_) {} return { stop, sessionId }; }
     await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
   } catch (err) {
     fail(err);
     stop();
   }
 
-  return { stop };
+  return { stop, sessionId };
 }
